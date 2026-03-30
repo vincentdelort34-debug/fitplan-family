@@ -1304,55 +1304,56 @@ function ajouterGlyco() {
 }
 
 function parseLibreViewCSV(text) {
-  const sep = text.includes(';') ? ';' : ',';
   const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
   const results = [];
 
-  // Détecter si c'est un export LibreView (contient "Type d'enregistrement" ou "Record Type")
-  const headerLine = lines.find(l => l.toLowerCase().includes('type') && l.toLowerCase().includes('glucose'));
-  const isLibreView = !!headerLine;
+  // Détecter le séparateur
+  const sep = lines[1]?.includes(';') ? ';' : ',';
+
+  // Détecter LibreView : cherche "Horodatage" ou "FreeStyle" ou "glycémie" ou "glucose"
+  const isLibreView = lines.some(l =>
+    l.toLowerCase().includes('horodatage') ||
+    l.toLowerCase().includes('freestyle') ||
+    l.toLowerCase().includes('glyc') ||
+    l.toLowerCase().includes('glucose')
+  );
 
   lines.forEach(line => {
     const parts = line.split(sep).map(p => p.replace(/^"|"$/g, '').trim());
-    if (parts.length < 3) return;
-
-    let dtStr = '', val = NaN;
 
     if (isLibreView) {
-      // Format LibreView : ID ; DeviceTime ; RecordedTime ; RecordType ; HistoricalGlucose ; ScannedGlucose ; ...
-      // RecordType 0 = mesure continue, 1 = scan manuel
+      // Format LibreView français :
+      // col0=Appareil, col1=NumSerie, col2=Horodatage(DD-MM-YYYY HH:MM), col3=Type, col4=Historique mgdL, col5=Scan mgdL
+      if (parts.length < 5) return;
       const recType = parseInt(parts[3]);
-      if (isNaN(recType) || recType > 1) return; // skip headers et autres types
+      if (isNaN(recType) || recType > 1) return; // skip lignes non-données
 
-      // Date en col 2 format "DD/MM/YYYY HH:MM" ou "MM-DD-YYYY HH:MM"
-      const rawDate = parts[2] || parts[1];
-      if (!rawDate || !rawDate.match(/\d{2}[\/\-]\d{2}[\/\-]\d{4}/)) return;
-
-      // Convertir DD/MM/YYYY HH:MM → ISO
-      const dateMatch = rawDate.match(/(\d{2})[\/\-](\d{2})[\/\-](\d{4})\s*(\d{2}:\d{2})?/);
+      const rawDate = parts[2];
+      // Format attendu : DD-MM-YYYY HH:MM ou DD/MM/YYYY HH:MM
+      const dateMatch = rawDate?.match(/(\d{2})[\-\/](\d{2})[\-\/](\d{4})\s+(\d{2}:\d{2})/);
       if (!dateMatch) return;
-      // Essayer DD/MM/YYYY d'abord (format français)
-      const d = dateMatch[1], m = dateMatch[2], y = dateMatch[3], t = dateMatch[4] || '00:00';
-      dtStr = `${y}-${m}-${d}T${t}`;
+      const [, dd, mm, yyyy, hhmm] = dateMatch;
+      const dtStr = `${yyyy}-${mm}-${dd}T${hhmm}`;
 
-      // Glucose : col 4 (historique) ou col 5 (scanné), en mg/dL ou mmol/L
-      const raw4 = parseFloat((parts[4]||'').replace(',','.'));
-      const raw5 = parseFloat((parts[5]||'').replace(',','.'));
-      val = !isNaN(raw4) && raw4 > 0 ? raw4 : (!isNaN(raw5) && raw5 > 0 ? raw5 : NaN);
+      // Valeur : col4 (historique, type 0) ou col5 (scan, type 1)
+      const raw4 = parseFloat(parts[4]);
+      const raw5 = parseFloat(parts[5]);
+      let val = !isNaN(raw4) && raw4 > 0 ? raw4 : (!isNaN(raw5) && raw5 > 0 ? raw5 : NaN);
+      if (isNaN(val)) return;
 
-      // Si valeur en mmol/L (< 30), convertir en mg/dL
-      if (!isNaN(val) && val < 30) val = Math.round(val * 18.0182);
+      // Convertir mmol/L → mg/dL si valeur < 30
+      if (val < 30) val = Math.round(val * 18.0182);
+
+      results.push({ dt: dtStr, val: Math.round(val), ctx: 'import', note: '' });
 
     } else {
-      // Format générique : date ; heure ; valeur
+      // Format générique : date, heure, valeur
+      if (parts.length < 3) return;
       const dateStr = parts[0], timeStr = parts[1];
-      val = parseFloat((parts[2]||'').replace(',','.'));
-      if (!dateStr || !dateStr.match(/\d{2,4}/)) return;
-      dtStr = dateStr.replace(/\//g,'-').replace(/(\d{2})-(\d{2})-(\d{4})/,'$3-$2-$1') + 'T' + (timeStr||'00:00');
-    }
-
-    if (!isNaN(val) && val > 20 && val < 600 && dtStr) {
-      results.push({ dt: dtStr, val: Math.round(val), ctx: 'import', note: '' });
+      const val = parseFloat(parts[2].replace(',','.'));
+      if (!dateStr?.match(/\d{2,4}/) || isNaN(val)) return;
+      const dtStr = dateStr.replace(/\//g,'-').replace(/(\d{2})-(\d{2})-(\d{4})/, '$3-$2-$1') + 'T' + (timeStr||'00:00');
+      if (val > 20 && val < 600) results.push({ dt: dtStr, val: Math.round(val), ctx: 'import', note: '' });
     }
   });
   return results;
