@@ -1139,7 +1139,7 @@ function callAPI(prompt, targetId) {
   fetch('https://viti-tracabilit.vercel.app/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1000, messages: [{ role: 'user', content: prompt }] })
+    body: JSON.stringify({ max_tokens: 1500, messages: [{ role: 'user', content: prompt }] })
   })
   .then(r => r.json())
   .then(d => { document.getElementById(targetId).textContent = d.content?.map(i => i.text||'').join('\n') || 'Erreur.'; document.getElementById(targetId).className = ''; })
@@ -1670,7 +1670,7 @@ Réponds UNIQUEMENT en JSON valide, sans markdown, sans backticks :
   fetch('https://viti-tracabilit.vercel.app/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1000, messages: [{ role: 'user', content: prompt }] })
+    body: JSON.stringify({ max_tokens: 3000, messages: [{ role: 'user', content: prompt }] })
   })
   .then(r => r.json())
   .then(d => {
@@ -1762,7 +1762,7 @@ function genererRecettesFrigo() {
   fetch('https://viti-tracabilit.vercel.app/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1000, system: systemPrompt, messages })
+    body: JSON.stringify({ max_tokens: 1500, system: systemPrompt, messages })
   })
   .then(r => r.json())
   .then(d => {
