@@ -631,11 +631,12 @@ select option { background: var(--surface); }
   </div>
   <div class="card">
     <div class="card-title">📁 Importer CSV LibreView</div>
-    <div class="drop-zone" onclick="document.getElementById('csv-input').click()" style="padding:20px;">
-      <input type="file" id="csv-input" accept=".csv" onchange="handleCSVImport(event)">
+    <div class="drop-zone" id="csv-drop-zone" onclick="document.getElementById('csv-input').click()" style="padding:20px;">
+      <input type="file" id="csv-input" accept=".csv,.txt" onchange="handleCSVImport(event)">
       <div class="drop-icon">📊</div>
-      <div class="drop-label"><b>Cliquer pour importer ton export LibreView (.csv)</b><br><span style="font-size:11px;">LibreView → Mon profil → Exporter les données → CSV</span></div>
+      <div class="drop-label"><b>Cliquer ou glisser ton export LibreView (.csv)</b><br><span style="font-size:11px;">LibreView → Mon profil → Exporter les données → CSV</span></div>
     </div>
+    <div id="csv-import-result" class="import-result"></div>
   </div>
   <div class="card">
     <div class="card-title">📋 Historique mesures</div>
@@ -1302,31 +1303,103 @@ function ajouterGlyco() {
   renderGlyco();
 }
 
+function parseLibreViewCSV(text) {
+  const sep = text.includes(';') ? ';' : ',';
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  const results = [];
+
+  // Détecter si c'est un export LibreView (contient "Type d'enregistrement" ou "Record Type")
+  const headerLine = lines.find(l => l.toLowerCase().includes('type') && l.toLowerCase().includes('glucose'));
+  const isLibreView = !!headerLine;
+
+  lines.forEach(line => {
+    const parts = line.split(sep).map(p => p.replace(/^"|"$/g, '').trim());
+    if (parts.length < 3) return;
+
+    let dtStr = '', val = NaN;
+
+    if (isLibreView) {
+      // Format LibreView : ID ; DeviceTime ; RecordedTime ; RecordType ; HistoricalGlucose ; ScannedGlucose ; ...
+      // RecordType 0 = mesure continue, 1 = scan manuel
+      const recType = parseInt(parts[3]);
+      if (isNaN(recType) || recType > 1) return; // skip headers et autres types
+
+      // Date en col 2 format "DD/MM/YYYY HH:MM" ou "MM-DD-YYYY HH:MM"
+      const rawDate = parts[2] || parts[1];
+      if (!rawDate || !rawDate.match(/\d{2}[\/\-]\d{2}[\/\-]\d{4}/)) return;
+
+      // Convertir DD/MM/YYYY HH:MM → ISO
+      const dateMatch = rawDate.match(/(\d{2})[\/\-](\d{2})[\/\-](\d{4})\s*(\d{2}:\d{2})?/);
+      if (!dateMatch) return;
+      // Essayer DD/MM/YYYY d'abord (format français)
+      const d = dateMatch[1], m = dateMatch[2], y = dateMatch[3], t = dateMatch[4] || '00:00';
+      dtStr = `${y}-${m}-${d}T${t}`;
+
+      // Glucose : col 4 (historique) ou col 5 (scanné), en mg/dL ou mmol/L
+      const raw4 = parseFloat((parts[4]||'').replace(',','.'));
+      const raw5 = parseFloat((parts[5]||'').replace(',','.'));
+      val = !isNaN(raw4) && raw4 > 0 ? raw4 : (!isNaN(raw5) && raw5 > 0 ? raw5 : NaN);
+
+      // Si valeur en mmol/L (< 30), convertir en mg/dL
+      if (!isNaN(val) && val < 30) val = Math.round(val * 18.0182);
+
+    } else {
+      // Format générique : date ; heure ; valeur
+      const dateStr = parts[0], timeStr = parts[1];
+      val = parseFloat((parts[2]||'').replace(',','.'));
+      if (!dateStr || !dateStr.match(/\d{2,4}/)) return;
+      dtStr = dateStr.replace(/\//g,'-').replace(/(\d{2})-(\d{2})-(\d{4})/,'$3-$2-$1') + 'T' + (timeStr||'00:00');
+    }
+
+    if (!isNaN(val) && val > 20 && val < 600 && dtStr) {
+      results.push({ dt: dtStr, val: Math.round(val), ctx: 'import', note: '' });
+    }
+  });
+  return results;
+}
+
 function handleCSVImport(event) {
   const file = event.target.files[0];
   if (!file) return;
   const reader = new FileReader();
   reader.onload = function(e) {
-    const lines = e.target.result.split('\n');
+    const newEntries = parseLibreViewCSV(e.target.result);
+    const existingKeys = new Set(glycoData.map(g => (g.date||g.dt||'').substring(0,16) + g.val));
     let imported = 0;
-    lines.forEach(line => {
-      const parts = line.includes(';') ? line.split(';') : line.split(',');
-      if (parts.length < 3) return;
-      const dateStr = parts[0]?.trim(), timeStr = parts[1]?.trim();
-      const val = parseFloat(parts[2]?.trim().replace(',','.'));
-      if (!isNaN(val) && val > 20 && val < 600 && dateStr && dateStr.match(/\d{2,4}/)) {
-        const dtStr = dateStr.replace(/\//g,'-') + 'T' + (timeStr||'00:00');
-        glycoData.push({ dt: dtStr, val: Math.round(val), ctx: 'import', note: '' });
+    newEntries.forEach(g => {
+      const k = g.dt.substring(0,16) + g.val;
+      if (!existingKeys.has(k)) {
+        glycoData.push(g);
+        existingKeys.add(k);
+        if (sb) sb.from('fitplan_glyco').insert({ datetime: g.dt, val: g.val, ctx: 'import', note: '' }).then(() => {});
         imported++;
       }
     });
     glycoData.sort((a,b) => (a.date||a.dt||'').localeCompare(b.date||b.dt||''));
-    const seen = new Set(); glycoData = glycoData.filter(g => { const k = (g.date||g.dt||'')+g.val; if(seen.has(k)) return false; seen.add(k); return true; });
-    if (sb) { glycoData.forEach(g => { if (!g.id) sb.from('fitplan_glyco').insert({ datetime: g.date||g.dt, val: g.val, ctx: g.ctx, note: g.note||'' }).then(() => {}); }); }
-    alert(imported + ' mesures importées !'); renderGlyco();
+    const res = document.getElementById('csv-import-result');
+    if (res) {
+      res.textContent = imported > 0 ? `✅ ${imported} mesures importées !` : '⚠️ Aucune nouvelle mesure trouvée (déjà importées ou format non reconnu).';
+      res.classList.add('visible');
+    }
+    if (imported > 0) renderGlyco();
+    // Reset input pour permettre re-import
+    event.target.value = '';
   };
   reader.readAsText(file, 'UTF-8');
 }
+
+// Drag & drop pour la zone CSV
+document.addEventListener('DOMContentLoaded', function() {
+  const dz = document.getElementById('csv-drop-zone');
+  if (!dz) return;
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+  dz.addEventListener('drop', e => {
+    e.preventDefault(); dz.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file) handleCSVImport({ target: { files: [file], value: '' } });
+  });
+});
 
 function renderGlyco() {
   if (!glycoData.length) return;
