@@ -666,15 +666,34 @@ async function handleAuth() {
   const email = document.getElementById('auth-email').value.trim();
   const password = document.getElementById('auth-password').value;
   const errEl = document.getElementById('auth-error');
+  const btn = document.querySelector('#auth-screen button[onclick="handleAuth()"]');
   errEl.style.display = 'none';
+  errEl.style.color = '#c1623f';
   if (!email || !password) { errEl.textContent = 'Email et mot de passe requis.'; errEl.style.display = 'block'; return; }
-  if (authMode === 'login') {
-    const { error } = await sb.auth.signInWithPassword({ email, password });
-    if (error) { errEl.textContent = 'Email ou mot de passe incorrect.'; errEl.style.display = 'block'; }
-  } else {
-    const { error } = await sb.auth.signUp({ email, password });
-    if (error) { errEl.textContent = error.message; errEl.style.display = 'block'; }
-    else { errEl.style.color = '#6b8f71'; errEl.textContent = 'Compte créé ! Vérifie tes emails pour confirmer.'; errEl.style.display = 'block'; }
+  if (!sb) {
+    errEl.textContent = 'Connexion au serveur impossible. Rechargez la page.';
+    errEl.style.display = 'block';
+    return;
+  }
+  if (btn) { btn.textContent = '⏳ Chargement...'; btn.disabled = true; }
+  try {
+    if (authMode === 'login') {
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) { errEl.textContent = 'Email ou mot de passe incorrect.'; errEl.style.display = 'block'; }
+    } else {
+      const { data, error } = await sb.auth.signUp({ email, password });
+      if (error) { errEl.textContent = error.message; errEl.style.display = 'block'; }
+      else if (data?.user && !data?.session) {
+        errEl.style.color = '#6b8f71';
+        errEl.textContent = 'Compte créé ! Vérifie tes emails pour confirmer.';
+        errEl.style.display = 'block';
+      }
+    }
+  } catch(e) {
+    errEl.textContent = 'Erreur : ' + e.message;
+    errEl.style.display = 'block';
+  } finally {
+    if (btn) { btn.textContent = 'Accéder →'; btn.disabled = false; }
   }
 }
 
