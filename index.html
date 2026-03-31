@@ -497,7 +497,15 @@ select option { background: var(--surface); }
   <!-- BARRE KCAL JOURNÉE -->
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-      <div class="card-title" style="margin-bottom:0;">📊 Journée du <span id="repas-date-v"></span></div>
+      <div>
+        <div class="card-title" style="margin-bottom:2px;">📊 Journée du <span id="repas-date-v"></span></div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:4px;">
+          <button onclick="changerDateRepas('v',-1)" style="background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;padding:3px 10px;font-size:13px;cursor:pointer;color:var(--muted);">←</button>
+          <input type="date" id="repas-date-input-v" onchange="setRepasDate('v',this.value)" style="font-size:12px;padding:3px 8px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text);font-family:'Nunito';">
+          <button onclick="changerDateRepas('v',1)" style="background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;padding:3px 10px;font-size:13px;cursor:pointer;color:var(--muted);">→</button>
+          <button onclick="setRepasDate('v',getTodayStr())" style="background:var(--blue-pale);border:1.5px solid var(--blue);border-radius:8px;padding:3px 10px;font-size:11px;cursor:pointer;color:var(--blue);font-weight:700;">Auj.</button>
+        </div>
+      </div>
       <div style="font-family:'DM Mono';font-size:14px;font-weight:600;color:var(--blue);" id="kcal-total-v">0 kcal</div>
     </div>
     <div class="kcal-bar-wrap"><div class="kcal-bar" id="kcal-bar-v" style="width:0%"></div></div>
@@ -570,7 +578,15 @@ select option { background: var(--surface); }
 
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-      <div class="card-title" style="margin-bottom:0;color:var(--pink);">📊 Journée du <span id="repas-date-e"></span></div>
+      <div>
+        <div class="card-title" style="margin-bottom:2px;color:var(--pink);">📊 Journée du <span id="repas-date-e"></span></div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:4px;">
+          <button onclick="changerDateRepas('e',-1)" style="background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;padding:3px 10px;font-size:13px;cursor:pointer;color:var(--muted);">←</button>
+          <input type="date" id="repas-date-input-e" onchange="setRepasDate('e',this.value)" style="font-size:12px;padding:3px 8px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text);font-family:'Nunito';">
+          <button onclick="changerDateRepas('e',1)" style="background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;padding:3px 10px;font-size:13px;cursor:pointer;color:var(--muted);">→</button>
+          <button onclick="setRepasDate('e',getTodayStr())" style="background:var(--pink-pale);border:1.5px solid var(--pink);border-radius:8px;padding:3px 10px;font-size:11px;cursor:pointer;color:var(--pink);font-weight:700;">Auj.</button>
+        </div>
+      </div>
       <div style="font-family:'DM Mono';font-size:14px;font-weight:600;color:var(--pink);" id="kcal-total-e">0 kcal</div>
     </div>
     <div class="kcal-bar-wrap"><div class="kcal-bar" id="kcal-bar-e" style="width:0%;background:linear-gradient(90deg,var(--pink),var(--gold));"></div></div>
@@ -1794,17 +1810,37 @@ const OBJECTIF_KCAL = { v: 1800, e: 1600 };
 
 function getTodayStr() { return new Date().toISOString().split('T')[0]; }
 
+let selectedRepasDate = { v: getTodayStr(), e: getTodayStr() };
+
+function setRepasDate(who, date) {
+  if (!date) return;
+  selectedRepasDate[who] = date;
+  const inp = document.getElementById('repas-date-input-' + who);
+  if (inp) inp.value = date;
+  initRepasPage(who);
+}
+
+function changerDateRepas(who, delta) {
+  const d = new Date(selectedRepasDate[who]);
+  d.setDate(d.getDate() + delta);
+  const newDate = d.toISOString().split('T')[0];
+  setRepasDate(who, newDate);
+}
+
 function getRepasAujourdhui(who) {
   const data = who === 'v' ? repasVincent : repasElisabeth;
-  return data.filter(r => r.date === getTodayStr());
+  return data.filter(r => r.date === selectedRepasDate[who]);
 }
 
 function initRepasPage(who) {
-  // Afficher date
-  const d = new Date();
+  // Afficher date sélectionnée
+  const selDate = selectedRepasDate[who] || getTodayStr();
+  const d = new Date(selDate + 'T12:00:00');
   const dateLabel = d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
   const el = document.getElementById('repas-date-' + who);
   if (el) el.textContent = dateLabel;
+  const inp = document.getElementById('repas-date-input-' + who);
+  if (inp) inp.value = selDate;
 
   // Config petit-déj
   const cfg = petitDejConfig[who];
@@ -1836,7 +1872,7 @@ function initRepasPage(who) {
 function validerPetitDej(who) {
   const cfg = petitDejConfig[who];
   if (cfg.kcal === 0 && who === 'e') { configurerPetitDej('e'); return; }
-  const repas = { date: getTodayStr(), type: 'petit-dej', description: cfg.label, kcal: cfg.kcal, proteines: cfg.proteines, glucides: cfg.glucides, lipides: cfg.lipides, photoThumb: null, conseil: '' };
+  const repas = { date: selectedRepasDate[who]||getTodayStr(), type: 'petit-dej', description: cfg.label, kcal: cfg.kcal, proteines: cfg.proteines, glucides: cfg.glucides, lipides: cfg.lipides, photoThumb: null, conseil: '' };
   if (who === 'v') {
     repasVincent.push(repas);
     if (sb) sb.from('fitplan_repas').insert({ who: 'vincent', date: repas.date, type: repas.type, label: repas.description, kcal: repas.kcal||0, proteines: repas.proteines||0, glucides: repas.glucides||0, lipides: repas.lipides||0 }).then(() => {});
@@ -1974,7 +2010,7 @@ function saveRepas(who, resStr) {
   const res = typeof resStr === 'string' ? JSON.parse(resStr.replace(/&quot;/g,'"')) : resStr;
   const type = repasTypeEnCours[who];
   const repas = {
-    date: getTodayStr(), type,
+    date: selectedRepasDate[who]||getTodayStr(), type,
     description: res.description || document.getElementById('repas-text-' + who).value.substring(0,80),
     kcal: res.kcal, proteines: res.proteines, glucides: res.glucides, lipides: res.lipides,
     conseil: res.conseil, score: res.score, photoThumb: null
