@@ -1821,7 +1821,7 @@ function validerPetitDej(who) {
   if (!cfg) return;
   const repas = { date: selectedRepasDate[who]||getTodayStr(), type: 'petit-dej', description: cfg.label, kcal: cfg.kcal, proteines: cfg.proteines, glucides: cfg.glucides, lipides: cfg.lipides, photoThumb: null, conseil: '' };
   repasVincent.push(repas);
-  if (sb && currentUser) sb.from('fitplan_repas').insert({ user_id: currentUser.id, date: repas.date, type: repas.type, label: repas.description, kcal: repas.kcal||0, proteines: repas.proteines||0, glucides: repas.glucides||0, lipides: repas.lipides||0 }).then(() => {});
+  if (sb && currentUser) sb.from('fitplan_repas').insert({ user_id: currentUser.id, who: userProfile?.nom||'user', date: repas.date, type: repas.type, label: repas.description, kcal: repas.kcal||0, proteines: repas.proteines||0, glucides: repas.glucides||0, lipides: repas.lipides||0 }).then(() => {});
   initRepasPage(who);
 }
 
@@ -1973,7 +1973,7 @@ function saveRepas(who, resStr) {
 function doSave(who, repas) {
   repasVincent.push(repas);
   if (sb && currentUser) {
-    const payload = { user_id: currentUser.id, date: repas.date, type: repas.type, label: repas.description||'', kcal: repas.kcal||0, proteines: repas.proteines||0, glucides: repas.glucides||0, lipides: repas.lipides||0 };
+    const payload = { user_id: currentUser.id, who: userProfile?.nom || 'user', date: repas.date, type: repas.type, label: repas.description||'', kcal: repas.kcal||0, proteines: repas.proteines||0, glucides: repas.glucides||0, lipides: repas.lipides||0 };
     sb.from('fitplan_repas').insert(payload).then(({ data, error }) => {
       if (error) alert('❌ Erreur: ' + error.message + '\nCode: ' + error.code + '\nuser_id: ' + currentUser.id);
       else alert('✅ Sauvegardé!\nuser_id: ' + currentUser.id + '\ndata: ' + JSON.stringify(data));
