@@ -785,6 +785,9 @@ async function initSupabase() {
     const res = await fetch('/api/config');
     if (!res.ok) throw new Error('Config unavailable');
     const { url, key } = await res.json();
+    if (!url || !key) throw new Error('SUPABASE_URL ou SUPABASE_ANON_KEY manquants dans Vercel');
+    // Affiche l'URL pour debug (à supprimer après)
+    document.title = 'FP:' + url.substring(0,30);
     sb = supabase.createClient(url, key);
 
     sb.auth.onAuthStateChange(async (event, session) => {
