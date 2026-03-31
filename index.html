@@ -645,6 +645,8 @@ let glycoData = [];
 let repasVincent = [];
 let repasElisabeth = [];
 let sb = null;
+let supabaseUrl = '';
+let supabaseKey = '';
 let currentUser = null;
 let userProfile = null;
 const today = new Date().toISOString().split('T')[0];
@@ -662,6 +664,22 @@ function switchAuthTab(mode) {
   document.getElementById('auth-tab-signup').style.color = mode==='signup' ? '#fff' : '#8a8278';
 }
 
+function storeSession(data) {
+  localStorage.setItem('fitplan_auth', JSON.stringify({
+    access_token: data.access_token,
+    refresh_token: data.refresh_token,
+    expires_at: Math.floor(Date.now() / 1000) + (data.expires_in || 3600),
+    user: { id: data.user.id, email: data.user.email }
+  }));
+}
+
+function createSupabaseClient(access_token) {
+  sb = supabase.createClient(supabaseUrl, supabaseKey, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    global: { headers: { Authorization: `Bearer ${access_token}` } }
+  });
+}
+
 async function handleAuth() {
   const email = document.getElementById('auth-email').value.trim();
   const password = document.getElementById('auth-password').value;
@@ -670,26 +688,27 @@ async function handleAuth() {
   errEl.style.display = 'none';
   errEl.style.color = '#c1623f';
   if (!email || !password) { errEl.textContent = 'Email et mot de passe requis.'; errEl.style.display = 'block'; return; }
-  if (!sb) {
-    errEl.textContent = 'Connexion au serveur impossible. Rechargez la page.';
-    errEl.style.display = 'block';
-    return;
-  }
   if (btn) { btn.textContent = '⏳ Chargement...'; btn.disabled = true; }
-  const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout réseau (10s) — vérifie ta connexion')), 10000));
   try {
-    let result;
-    if (authMode === 'login') {
-      result = await Promise.race([sb.auth.signInWithPassword({ email, password }), timeout]);
-      if (result.error) { errEl.textContent = 'Erreur : ' + result.error.message; errEl.style.display = 'block'; }
+    const action = authMode === 'login' ? 'signIn' : 'signUp';
+    const r = await fetch('/api/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, email, password })
+    });
+    const data = await r.json();
+    if (data.error || data.error_code) {
+      errEl.textContent = data.error_description || data.error || data.msg || 'Erreur inconnue';
+      errEl.style.display = 'block';
+    } else if (data.access_token) {
+      storeSession(data);
+      createSupabaseClient(data.access_token);
+      currentUser = { id: data.user.id, email: data.user.email };
+      await loadUserProfile();
     } else {
-      result = await Promise.race([sb.auth.signUp({ email, password }), timeout]);
-      if (result.error) { errEl.textContent = 'Erreur : ' + result.error.message; errEl.style.display = 'block'; }
-      else if (result.data?.user && !result.data?.session) {
-        errEl.style.color = '#6b8f71';
-        errEl.textContent = 'Compte créé ! Vérifie tes emails pour confirmer.';
-        errEl.style.display = 'block';
-      }
+      errEl.style.color = '#6b8f71';
+      errEl.textContent = 'Compte créé ! Vérifie tes emails pour confirmer.';
+      errEl.style.display = 'block';
     }
   } catch(e) {
     errEl.textContent = 'Erreur : ' + e.message;
@@ -702,12 +721,19 @@ async function handleAuth() {
 async function resetPassword() {
   const email = document.getElementById('auth-email').value.trim();
   if (!email) { alert('Entre ton email d\'abord.'); return; }
-  await sb.auth.resetPasswordForEmail(email);
+  await fetch(`${supabaseUrl}/auth/v1/recover`, {
+    method: 'POST',
+    headers: { 'apikey': supabaseKey, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email })
+  });
   alert('Email de réinitialisation envoyé !');
 }
 
-async function deconnexion() {
-  await sb.auth.signOut();
+function deconnexion() {
+  localStorage.removeItem('fitplan_auth');
+  currentUser = null;
+  userProfile = null;
+  showAuthScreen();
 }
 
 function showAuthScreen() {
@@ -785,29 +811,48 @@ async function initSupabase() {
     const res = await fetch('/api/config');
     if (!res.ok) throw new Error('Config unavailable');
     const { url, key } = await res.json();
-    if (!url || !key) throw new Error('SUPABASE_URL ou SUPABASE_ANON_KEY manquants dans Vercel');
-    // Affiche l'URL pour debug (à supprimer après)
-    document.title = 'FP:' + url.substring(0,30);
-    sb = supabase.createClient(url, key);
+    if (!url || !key) throw new Error('Env vars manquants');
+    supabaseUrl = url;
+    supabaseKey = key;
+    document.title = 'FitPlan — Domaine Delort';
 
-    sb.auth.onAuthStateChange(async (event, session) => {
-      if (session) {
-        currentUser = session.user;
-        await loadUserProfile();
-      } else {
-        currentUser = null;
-        userProfile = null;
-        showAuthScreen();
-      }
-    });
-
-    const { data: { session } } = await sb.auth.getSession();
-    if (session) {
-      currentUser = session.user;
-      await loadUserProfile();
-    } else {
-      showAuthScreen();
+    // Vérifier session stockée
+    const stored = localStorage.getItem('fitplan_auth');
+    if (stored) {
+      try {
+        const session = JSON.parse(stored);
+        const now = Math.floor(Date.now() / 1000);
+        if (session.access_token && session.expires_at > now + 60) {
+          // Token encore valide
+          createSupabaseClient(session.access_token);
+          currentUser = session.user;
+          await loadUserProfile();
+          return;
+        } else if (session.refresh_token) {
+          // Rafraîchir via proxy
+          const r = await fetch('/api/auth', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'refresh', refresh_token: session.refresh_token })
+          });
+          const data = await r.json();
+          if (data.access_token) {
+            storeSession(data);
+            createSupabaseClient(data.access_token);
+            currentUser = { id: data.user.id, email: data.user.email };
+            await loadUserProfile();
+            return;
+          }
+        }
+      } catch(e) { /* session corrompue */ }
+      localStorage.removeItem('fitplan_auth');
     }
+
+    // Pas de session — init client basique et afficher login
+    sb = supabase.createClient(url, key, {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+    });
+    showAuthScreen();
   } catch(e) {
     console.error('Supabase init failed:', e);
     showAuthScreen();
