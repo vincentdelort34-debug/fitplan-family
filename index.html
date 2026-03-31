@@ -496,17 +496,15 @@ select option { background: var(--surface); }
 
   <!-- BARRE KCAL JOURNÉE -->
   <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-      <div>
-        <div class="card-title" style="margin-bottom:2px;">📊 Journée du <span id="repas-date-v"></span></div>
-        <div style="display:flex;align-items:center;gap:6px;margin-top:4px;">
-          <button onclick="changerDateRepas('v',-1)" style="background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;padding:3px 10px;font-size:13px;cursor:pointer;color:var(--muted);">←</button>
-          <input type="date" id="repas-date-input-v" onchange="setRepasDate('v',this.value)" style="font-size:12px;padding:3px 8px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text);font-family:'Nunito';">
-          <button onclick="changerDateRepas('v',1)" style="background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;padding:3px 10px;font-size:13px;cursor:pointer;color:var(--muted);">→</button>
-          <button onclick="setRepasDate('v',getTodayStr())" style="background:var(--blue-pale);border:1.5px solid var(--blue);border-radius:8px;padding:3px 10px;font-size:11px;cursor:pointer;color:var(--blue);font-weight:700;">Auj.</button>
-        </div>
-      </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+      <div class="card-title" style="margin-bottom:0;">📊 Journée du <span id="repas-date-v"></span></div>
       <div style="font-family:'DM Mono';font-size:14px;font-weight:600;color:var(--blue);" id="kcal-total-v">0 kcal</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:5px;margin-bottom:10px;">
+      <button onclick="changerDateRepas('v',-1)" style="background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;padding:4px 12px;font-size:14px;cursor:pointer;color:var(--muted);">←</button>
+      <input type="date" id="repas-date-input-v" onchange="setRepasDate('v',this.value)" style="flex:1;font-size:13px;padding:5px 8px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text);font-family:'Nunito';">
+      <button onclick="changerDateRepas('v',1)" style="background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;padding:4px 12px;font-size:14px;cursor:pointer;color:var(--muted);">→</button>
+      <button onclick="setRepasDate('v',getTodayStr())" style="background:var(--blue-pale);border:1.5px solid var(--blue);border-radius:8px;padding:4px 10px;font-size:11px;cursor:pointer;color:var(--blue);font-weight:700;white-space:nowrap;">Auj.</button>
     </div>
     <div class="kcal-bar-wrap"><div class="kcal-bar" id="kcal-bar-v" style="width:0%"></div></div>
     <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:4px;"><span>0</span><span>Objectif 1800 kcal</span></div>
@@ -577,17 +575,15 @@ select option { background: var(--surface); }
   </div>
 
   <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-      <div>
-        <div class="card-title" style="margin-bottom:2px;color:var(--pink);">📊 Journée du <span id="repas-date-e"></span></div>
-        <div style="display:flex;align-items:center;gap:6px;margin-top:4px;">
-          <button onclick="changerDateRepas('e',-1)" style="background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;padding:3px 10px;font-size:13px;cursor:pointer;color:var(--muted);">←</button>
-          <input type="date" id="repas-date-input-e" onchange="setRepasDate('e',this.value)" style="font-size:12px;padding:3px 8px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text);font-family:'Nunito';">
-          <button onclick="changerDateRepas('e',1)" style="background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;padding:3px 10px;font-size:13px;cursor:pointer;color:var(--muted);">→</button>
-          <button onclick="setRepasDate('e',getTodayStr())" style="background:var(--pink-pale);border:1.5px solid var(--pink);border-radius:8px;padding:3px 10px;font-size:11px;cursor:pointer;color:var(--pink);font-weight:700;">Auj.</button>
-        </div>
-      </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+      <div class="card-title" style="margin-bottom:0;color:var(--pink);">📊 Journée du <span id="repas-date-e"></span></div>
       <div style="font-family:'DM Mono';font-size:14px;font-weight:600;color:var(--pink);" id="kcal-total-e">0 kcal</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:5px;margin-bottom:10px;">
+      <button onclick="changerDateRepas('e',-1)" style="background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;padding:4px 12px;font-size:14px;cursor:pointer;color:var(--muted);">←</button>
+      <input type="date" id="repas-date-input-e" onchange="setRepasDate('e',this.value)" style="flex:1;font-size:13px;padding:5px 8px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text);font-family:'Nunito';">
+      <button onclick="changerDateRepas('e',1)" style="background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;padding:4px 12px;font-size:14px;cursor:pointer;color:var(--muted);">→</button>
+      <button onclick="setRepasDate('e',getTodayStr())" style="background:var(--pink-pale);border:1.5px solid var(--pink);border-radius:8px;padding:4px 10px;font-size:11px;cursor:pointer;color:var(--pink);font-weight:700;white-space:nowrap;">Auj.</button>
     </div>
     <div class="kcal-bar-wrap"><div class="kcal-bar" id="kcal-bar-e" style="width:0%;background:linear-gradient(90deg,var(--pink),var(--gold));"></div></div>
     <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:4px;"><span>0</span><span>Objectif 1600 kcal</span></div>
