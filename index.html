@@ -676,14 +676,16 @@ async function handleAuth() {
     return;
   }
   if (btn) { btn.textContent = '⏳ Chargement...'; btn.disabled = true; }
+  const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout réseau (10s) — vérifie ta connexion')), 10000));
   try {
+    let result;
     if (authMode === 'login') {
-      const { error } = await sb.auth.signInWithPassword({ email, password });
-      if (error) { errEl.textContent = 'Email ou mot de passe incorrect.'; errEl.style.display = 'block'; }
+      result = await Promise.race([sb.auth.signInWithPassword({ email, password }), timeout]);
+      if (result.error) { errEl.textContent = 'Erreur : ' + result.error.message; errEl.style.display = 'block'; }
     } else {
-      const { data, error } = await sb.auth.signUp({ email, password });
-      if (error) { errEl.textContent = error.message; errEl.style.display = 'block'; }
-      else if (data?.user && !data?.session) {
+      result = await Promise.race([sb.auth.signUp({ email, password }), timeout]);
+      if (result.error) { errEl.textContent = 'Erreur : ' + result.error.message; errEl.style.display = 'block'; }
+      else if (result.data?.user && !result.data?.session) {
         errEl.style.color = '#6b8f71';
         errEl.textContent = 'Compte créé ! Vérifie tes emails pour confirmer.';
         errEl.style.display = 'block';
