@@ -674,11 +674,14 @@ function storeSession(data) {
   }));
 }
 
-function createSupabaseClient(access_token) {
+async function createSupabaseClient(access_token, refresh_token) {
   sb = supabase.createClient(supabaseUrl, supabaseKey, {
-    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-    global: { headers: { Authorization: `Bearer ${access_token}` } }
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
   });
+  if (access_token) {
+    // setSession avec un token frais ne fait pas d'appel réseau
+    await sb.auth.setSession({ access_token, refresh_token: refresh_token || access_token });
+  }
 }
 
 async function handleAuth() {
@@ -703,7 +706,7 @@ async function handleAuth() {
       errEl.style.display = 'block';
     } else if (data.access_token) {
       storeSession(data);
-      createSupabaseClient(data.access_token);
+      await createSupabaseClient(data.access_token, data.refresh_token);
       currentUser = { id: data.user.id, email: data.user.email };
       await loadUserProfile();
     } else {
@@ -825,7 +828,7 @@ async function initSupabase() {
         const now = Math.floor(Date.now() / 1000);
         if (session.access_token && session.expires_at > now + 60) {
           // Token encore valide
-          createSupabaseClient(session.access_token);
+          await createSupabaseClient(session.access_token, session.refresh_token);
           currentUser = session.user;
           await loadUserProfile();
           return;
@@ -839,7 +842,7 @@ async function initSupabase() {
           const data = await r.json();
           if (data.access_token) {
             storeSession(data);
-            createSupabaseClient(data.access_token);
+            await createSupabaseClient(data.access_token, data.refresh_token);
             currentUser = { id: data.user.id, email: data.user.email };
             await loadUserProfile();
             return;
