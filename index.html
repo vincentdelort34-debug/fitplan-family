@@ -6,86 +6,43 @@
 <title>FitPlan — Domaine Delort</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400;1,600&family=Nunito:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 
-<!-- ÉCRAN DE CONNEXION -->
-<style>
-#login-screen {
-  position: fixed; inset: 0; z-index: 9999;
-  background: #1a5f7a;
-  display: flex; align-items: center; justify-content: center;
-  padding: 24px;
-}
-#login-screen.hidden { display: none; }
-.login-box {
-  background: #fff;
-  border-radius: 20px;
-  padding: 36px 28px;
-  width: 100%; max-width: 340px;
-  text-align: center;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.25);
-}
-.login-logo {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: 2rem; font-style: italic;
-  color: #1a5f7a; margin-bottom: 6px;
-}
-.login-logo em { color: #d4a853; font-style: normal; }
-.login-sub { font-family: 'Nunito', sans-serif; font-size: 13px; color: #8a8278; margin-bottom: 28px; }
-.login-box input {
-  width: 100%; padding: 12px 16px;
-  border: 1.5px solid #ddd8ce; border-radius: 12px;
-  font-family: 'Nunito', sans-serif; font-size: 16px;
-  color: #2c2c2c; background: #f9f6f0;
-  text-align: center; letter-spacing: 3px;
-  margin-bottom: 14px;
-  box-sizing: border-box;
-}
-.login-box input:focus { outline: none; border-color: #1a5f7a; }
-.login-btn {
-  width: 100%; padding: 13px;
-  background: #1a5f7a; color: #fff;
-  border: none; border-radius: 12px;
-  font-family: 'Nunito', sans-serif; font-size: 15px; font-weight: 700;
-  cursor: pointer; transition: background 0.2s;
-}
-.login-btn:hover { background: #2980a0; }
-.login-error {
-  color: #c1623f; font-size: 13px; margin-top: 10px;
-  font-family: 'Nunito', sans-serif; display: none;
-}
-.login-error.visible { display: block; }
-</style>
-
-<div id="login-screen">
-  <div class="login-box">
-    <div class="login-logo">Fit<em>Plan</em></div>
-    <div class="login-sub">Domaine Delort · Accès privé</div>
-    <input type="password" id="login-input" placeholder="Mot de passe" onkeydown="if(event.key==='Enter')checkLogin()">
-    <button class="login-btn" onclick="checkLogin()">Accéder →</button>
-    <div class="login-error" id="login-error">Mot de passe incorrect</div>
+<!-- ÉCRAN AUTH SUPABASE -->
+<div id="auth-screen" style="position:fixed;inset:0;z-index:9999;background:#1a5f7a;display:flex;align-items:center;justify-content:center;padding:24px;">
+  <div style="background:#fff;border-radius:20px;padding:36px 28px;width:100%;max-width:340px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
+    <div style="font-family:'Cormorant Garamond',serif;font-size:2rem;font-style:italic;color:#1a5f7a;margin-bottom:6px;">Fit<span style="color:#d4a853;font-style:normal;">Plan</span></div>
+    <div style="font-family:'Nunito',sans-serif;font-size:13px;color:#8a8278;margin-bottom:24px;">Accès privé · Domaine Delort</div>
+    <div style="display:flex;background:#f5f0e8;border-radius:100px;padding:3px;margin-bottom:20px;gap:2px;">
+      <button id="auth-tab-login" onclick="switchAuthTab('login')" style="flex:1;padding:8px;border-radius:100px;border:none;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;cursor:pointer;background:#1a5f7a;color:#fff;">Connexion</button>
+      <button id="auth-tab-signup" onclick="switchAuthTab('signup')" style="flex:1;padding:8px;border-radius:100px;border:none;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;cursor:pointer;background:transparent;color:#8a8278;">Créer un compte</button>
+    </div>
+    <input type="email" id="auth-email" placeholder="Email" style="width:100%;padding:12px 16px;border:1.5px solid #ddd8ce;border-radius:12px;font-family:'Nunito',sans-serif;font-size:16px;margin-bottom:10px;box-sizing:border-box;background:#f9f6f0;">
+    <input type="password" id="auth-password" placeholder="Mot de passe" onkeydown="if(event.key==='Enter')handleAuth()" style="width:100%;padding:12px 16px;border:1.5px solid #ddd8ce;border-radius:12px;font-family:'Nunito',sans-serif;font-size:16px;margin-bottom:14px;box-sizing:border-box;background:#f9f6f0;">
+    <button onclick="handleAuth()" style="width:100%;padding:13px;background:#1a5f7a;color:#fff;border:none;border-radius:12px;font-family:'Nunito',sans-serif;font-size:15px;font-weight:700;cursor:pointer;">Accéder →</button>
+    <div id="auth-error" style="color:#c1623f;font-size:13px;margin-top:10px;font-family:'Nunito',sans-serif;display:none;"></div>
+    <div id="auth-forgot" style="margin-top:12px;font-size:12px;color:#8a8278;font-family:'Nunito',sans-serif;"><span onclick="resetPassword()" style="cursor:pointer;text-decoration:underline;">Mot de passe oublié ?</span></div>
   </div>
 </div>
 
-<script>
-// Mot de passe — change "delort2026" par ce que tu veux
-const APP_PASSWORD = 'delort2026';
-
-function checkLogin() {
-  const val = document.getElementById('login-input').value;
-  if (val === APP_PASSWORD) {
-    sessionStorage.setItem('fitplan_auth', '1');
-    document.getElementById('login-screen').classList.add('hidden');
-  } else {
-    document.getElementById('login-error').classList.add('visible');
-    document.getElementById('login-input').value = '';
-    document.getElementById('login-input').focus();
-  }
-}
-
-// Si déjà connecté dans cette session, ne pas re-demander
-if (sessionStorage.getItem('fitplan_auth') === '1') {
-  document.getElementById('login-screen').classList.add('hidden');
-}
-</script>
+<!-- ÉCRAN ONBOARDING -->
+<div id="onboarding-screen" style="position:fixed;inset:0;z-index:9998;background:#f5f0e8;display:none;overflow-y:auto;padding:24px;">
+  <div style="max-width:420px;margin:0 auto;padding-bottom:40px;">
+    <div style="font-family:'Cormorant Garamond',serif;font-size:1.8rem;font-style:italic;color:#1a5f7a;text-align:center;margin:24px 0 8px;">Bienvenue !</div>
+    <div style="font-family:'Nunito',sans-serif;font-size:14px;color:#8a8278;text-align:center;margin-bottom:28px;">Configure ton profil pour personnaliser l'app</div>
+    <div style="background:#fff;border-radius:18px;padding:20px;box-shadow:0 2px 12px rgba(0,0,0,0.06);">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div style="grid-column:1/-1;display:flex;flex-direction:column;gap:5px;"><label style="font-size:11px;text-transform:uppercase;letter-spacing:0.6px;color:#8a8278;font-weight:700;">Prénom</label><input id="ob-nom" type="text" placeholder="Vincent" style="padding:10px 12px;border:1.5px solid #ddd8ce;border-radius:10px;font-family:'Nunito',sans-serif;font-size:15px;"></div>
+        <div style="display:flex;flex-direction:column;gap:5px;"><label style="font-size:11px;text-transform:uppercase;letter-spacing:0.6px;color:#8a8278;font-weight:700;">Âge</label><input id="ob-age" type="number" placeholder="51" style="padding:10px 12px;border:1.5px solid #ddd8ce;border-radius:10px;font-family:'Nunito',sans-serif;font-size:15px;"></div>
+        <div style="display:flex;flex-direction:column;gap:5px;"><label style="font-size:11px;text-transform:uppercase;letter-spacing:0.6px;color:#8a8278;font-weight:700;">Taille (cm)</label><input id="ob-taille" type="number" placeholder="178" style="padding:10px 12px;border:1.5px solid #ddd8ce;border-radius:10px;font-family:'Nunito',sans-serif;font-size:15px;"></div>
+        <div style="display:flex;flex-direction:column;gap:5px;"><label style="font-size:11px;text-transform:uppercase;letter-spacing:0.6px;color:#8a8278;font-weight:700;">Poids actuel (kg)</label><input id="ob-poids" type="number" placeholder="93" step="0.1" style="padding:10px 12px;border:1.5px solid #ddd8ce;border-radius:10px;font-family:'Nunito',sans-serif;font-size:15px;"></div>
+        <div style="display:flex;flex-direction:column;gap:5px;"><label style="font-size:11px;text-transform:uppercase;letter-spacing:0.6px;color:#8a8278;font-weight:700;">Objectif (kg)</label><input id="ob-objectif" type="number" placeholder="83" step="0.1" style="padding:10px 12px;border:1.5px solid #ddd8ce;border-radius:10px;font-family:'Nunito',sans-serif;font-size:15px;"></div>
+        <div style="display:flex;flex-direction:column;gap:5px;"><label style="font-size:11px;text-transform:uppercase;letter-spacing:0.6px;color:#8a8278;font-weight:700;">Sexe</label><select id="ob-sexe" style="padding:10px 12px;border:1.5px solid #ddd8ce;border-radius:10px;font-family:'Nunito',sans-serif;font-size:15px;background:#f9f6f0;"><option value="h">Homme</option><option value="f">Femme</option></select></div>
+        <div style="grid-column:1/-1;display:flex;flex-direction:column;gap:5px;"><label style="font-size:11px;text-transform:uppercase;letter-spacing:0.6px;color:#8a8278;font-weight:700;">Sport principal</label><select id="ob-sport" style="padding:10px 12px;border:1.5px solid #ddd8ce;border-radius:10px;font-family:'Nunito',sans-serif;font-size:15px;background:#f9f6f0;"><option value="velo">Vélo / Gravel</option><option value="course">Course à pied</option><option value="mixte">Mixte (vélo + course)</option><option value="marche">Marche / Randonnée</option><option value="autre">Autre</option></select></div>
+        <div style="grid-column:1/-1;display:flex;flex-direction:column;gap:5px;"><label style="font-size:11px;text-transform:uppercase;letter-spacing:0.6px;color:#8a8278;font-weight:700;">Objectif calorique/jour (kcal)</label><input id="ob-kcal" type="number" placeholder="1800" style="padding:10px 12px;border:1.5px solid #ddd8ce;border-radius:10px;font-family:'Nunito',sans-serif;font-size:15px;"></div>
+      </div>
+      <button onclick="sauvegarderProfil()" style="width:100%;margin-top:20px;padding:14px;background:#1a5f7a;color:#fff;border:none;border-radius:12px;font-family:'Nunito',sans-serif;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 3px 10px rgba(26,95,122,0.25);">Commencer →</button>
+    </div>
+  </div>
+</div>
 <style>
 :root {
   --bg: #f5f0e8;
@@ -339,15 +296,15 @@ select option { background: var(--surface); }
 </head>
 <body>
 
-<header>
+<header style="display:none;">
   <div class="header-top">
     <div>
       <div class="logo">Fit<em>Plan</em> <span style="font-size:0.8rem;color:rgba(255,255,255,0.4);font-style:normal;font-family:'Nunito';">· Domaine Delort</span></div>
       <div id="header-date" style="font-size:11px;color:rgba(255,255,255,0.45);font-family:'Nunito';margin-top:2px;"></div>
     </div>
-    <div class="who-toggle">
-      <button class="who-btn active" onclick="switchWho('vincent',this)">Vincent</button>
-      <button class="who-btn" onclick="switchWho('femme',this)">Elisabeth</button>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div id="header-user" style="font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;color:rgba(255,255,255,0.9);"></div>
+      <button onclick="deconnexion()" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);border-radius:8px;padding:5px 10px;color:rgba(255,255,255,0.8);font-size:12px;cursor:pointer;font-family:'Nunito',sans-serif;">Sortir</button>
     </div>
   </div>
   <div class="tabs" id="tabs-vincent">
@@ -358,13 +315,6 @@ select option { background: var(--surface); }
     <div class="tab" onclick="showSection('recettes',event)">👨‍🍳 Recettes</div>
     <div class="tab" onclick="showSection('poids',event)">⚖️ Poids</div>
     <div class="tab tab-discrete" onclick="showSection('glycemie',event)">Glycémie</div>
-  </div>
-  <div class="tabs" id="tabs-femme" style="display:none;">
-    <div class="tab active" onclick="showSectionFemme('fdashboard',event)">🌸 Dashboard</div>
-    <div class="tab" onclick="showSectionFemme('fplan',event)">📅 Plan</div>
-    <div class="tab" onclick="showSectionFemme('fsortie',event)">🏃 Sortie</div>
-    <div class="tab" onclick="showSectionFemme('frepas',event)">🍽 Repas</div>
-    <div class="tab" onclick="showSectionFemme('fpoids',event)">⚖️ Poids</div>
   </div>
 </header>
 
@@ -380,7 +330,7 @@ select option { background: var(--surface); }
   </div>
 </div>
 
-<div class="main">
+<div class="main" style="display:none;">
 
 <!-- ======= VINCENT ======= -->
 <div id="dashboard" class="section active">
@@ -573,75 +523,6 @@ select option { background: var(--surface); }
   </div>
 </div>
 
-<!-- REPAS ELISABETH -->
-<div id="frepas" class="section" style="display:none;">
-
-  <div class="card" id="petitdej-card-e">
-    <div class="card-title" style="color:var(--pink);">🌅 Petit-déjeuner</div>
-    <div style="display:flex;align-items:center;gap:12px;padding:10px 0;">
-      <div style="flex:1;">
-        <div style="font-size:14px;font-weight:600;" id="petitdej-label-e">Mon petit-déjeuner habituel</div>
-        <div style="font-size:12px;color:var(--muted);margin-top:3px;" id="petitdej-kcal-e">— kcal</div>
-      </div>
-      <button id="petitdej-btn-e" class="btn btn-pink" style="margin-top:0;padding:10px 16px;white-space:nowrap;" onclick="validerPetitDej('e')">✓ Validé</button>
-    </div>
-    <div style="font-size:12px;color:var(--muted);">Modifier le petit-déj habituel : <span style="color:var(--pink);cursor:pointer;font-weight:700;" onclick="configurerPetitDej('e')">Configurer →</span></div>
-  </div>
-
-  <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-      <div class="card-title" style="margin-bottom:0;color:var(--pink);">📊 Journée du <span id="repas-date-e"></span></div>
-      <div style="font-family:'DM Mono';font-size:14px;font-weight:600;color:var(--pink);" id="kcal-total-e">0 kcal</div>
-    </div>
-    <div style="display:flex;align-items:center;gap:5px;margin-bottom:10px;">
-      <button onclick="changerDateRepas('e',-1)" style="background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;padding:4px 12px;font-size:14px;cursor:pointer;color:var(--muted);">←</button>
-      <input type="date" id="repas-date-input-e" onchange="setRepasDate('e',this.value)" style="flex:1;font-size:13px;padding:5px 8px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text);font-family:'Nunito';">
-      <button onclick="changerDateRepas('e',1)" style="background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;padding:4px 12px;font-size:14px;cursor:pointer;color:var(--muted);">→</button>
-      <button onclick="setRepasDate('e',getTodayStr())" style="background:var(--pink-pale);border:1.5px solid var(--pink);border-radius:8px;padding:4px 10px;font-size:11px;cursor:pointer;color:var(--pink);font-weight:700;white-space:nowrap;">Auj.</button>
-    </div>
-    <div class="kcal-bar-wrap"><div class="kcal-bar" id="kcal-bar-e" style="width:0%;background:linear-gradient(90deg,var(--pink),var(--gold));"></div></div>
-    <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:4px;"><span>0</span><span>Objectif 1600 kcal</span></div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px;text-align:center;">
-      <div><div style="font-family:'DM Mono';font-size:1rem;color:var(--sage);font-weight:600;" id="prot-total-e">0g</div><div style="font-size:10px;color:var(--muted);">protéines</div></div>
-      <div><div style="font-family:'DM Mono';font-size:1rem;color:var(--gold);font-weight:600;" id="gluc-total-e">0g</div><div style="font-size:10px;color:var(--muted);">glucides</div></div>
-      <div><div style="font-family:'DM Mono';font-size:1rem;color:var(--terra);font-weight:600;" id="lip-total-e">0g</div><div style="font-size:10px;color:var(--muted);">lipides</div></div>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="card-title" style="color:var(--pink);">🍽 Repas du jour</div>
-    <div id="repas-list-e"></div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px;">
-      <button class="repas-add-btn" style="border-color:var(--pink);" onclick="ouvrirRepasLibre('e','dejeuner')">☀️<br><span>Déjeuner</span></button>
-      <button class="repas-add-btn" style="border-color:var(--pink);" onclick="ouvrirRepasLibre('e','collation')">🍎<br><span>Collation</span></button>
-      <button class="repas-add-btn" style="border-color:var(--pink);" onclick="ouvrirRepasLibre('e','diner')">🌙<br><span>Dîner</span></button>
-    </div>
-  </div>
-
-  <div class="card" id="repas-form-e" style="display:none;">
-    <div class="card-title" id="repas-form-title-e" style="color:var(--pink);">Ajouter un repas</div>
-    <div class="repas-photo-zone" onclick="document.getElementById('repas-photo-e').click()" style="border-color:#f0c0c8;">
-      <input type="file" id="repas-photo-e" accept="image/*" capture="environment" onchange="handleRepasPhoto(event,'e')">
-      <img id="repas-photo-preview-e" class="repas-photo-preview">
-      <div id="repas-photo-label-e">
-        <div style="font-size:1.6rem;margin-bottom:5px;">📸</div>
-        <div style="font-size:13px;color:var(--muted);"><b style="color:var(--pink);">Photo du repas</b> — optionnel</div>
-      </div>
-    </div>
-    <div class="form-group" style="margin-bottom:10px;">
-      <label>Ce que tu as mangé / bu</label>
-      <textarea id="repas-text-e" rows="3" placeholder="Ex : omelette 2 oeufs, pain complet, café, orange..."></textarea>
-    </div>
-    <div style="display:flex;gap:10px;">
-      <button class="btn btn-pink" style="flex:1;" onclick="analyserRepas('e')">✦ Analyser</button>
-      <button class="btn-outline" onclick="fermerRepasForm('e')">Annuler</button>
-    </div>
-    <div class="ai-box" id="repas-ai-e" style="margin-top:10px;background:linear-gradient(135deg,var(--pink-pale),#fff6f8);border-color:#f0c0c8;">
-      <div class="ai-label" style="color:var(--pink);">✦ Analyse nutritionnelle</div>
-      <div id="repas-ai-text-e"></div>
-    </div>
-  </div>
-</div>
 
 <div id="glycemie" class="section" style="display:none;">
   <div class="card">
@@ -753,115 +634,129 @@ select option { background: var(--surface); }
   <div id="poids-stats"></div>
 </div>
 
-<!-- ======= FEMME ======= -->
-<div id="fdashboard" class="section" style="display:none;">
-  <div class="femme-header">
-    <div class="femme-avatar">🌸</div>
-    <div>
-      <div class="femme-name">Elisabeth · 44 ans · 165 cm · 50 kg</div>
-      <div class="femme-meta">Course à pied · FC max théorique 176 bpm · En attente données Strava</div>
-    </div>
-  </div>
-  <div class="stats-grid">
-    <div class="stat-box pink"><div class="stat-val" id="fdash-poids">50</div><div class="stat-unit">kg</div><div class="stat-label">Poids actuel</div></div>
-    <div class="stat-box pink"><div class="stat-val" id="fdash-sorties">0</div><div class="stat-unit">sorties</div><div class="stat-label">Ce mois</div></div>
-    <div class="stat-box pink"><div class="stat-val" id="fdash-km">0</div><div class="stat-unit">km</div><div class="stat-label">Total</div></div>
-    <div class="stat-box pink"><div class="stat-val">176</div><div class="stat-unit">bpm</div><div class="stat-label">FC max théo.</div></div>
-  </div>
-  <div class="card">
-    <div class="card-title" style="color:var(--pink);">❤️ Zones FC — 44 ans · FC max 176 bpm</div>
-    <div class="zone-row"><div class="zone-name">Z1 Récup</div><div class="zone-bar-wrap"><div class="zone-bar" style="width:100%;background:#6b8f71;"></div></div><div class="zone-range">&lt; 106 bpm</div></div>
-    <div class="zone-row"><div class="zone-name">Z2 Endurance</div><div class="zone-bar-wrap"><div class="zone-bar" style="width:85%;background:#8ab58f;"></div></div><div class="zone-range">106–123</div></div>
-    <div class="zone-row"><div class="zone-name">Z3 Tempo</div><div class="zone-bar-wrap"><div class="zone-bar" style="width:68%;background:#d4a853;"></div></div><div class="zone-range">123–141</div></div>
-    <div class="zone-row"><div class="zone-name">Z4 Seuil</div><div class="zone-bar-wrap"><div class="zone-bar" style="width:50%;background:#c1623f;"></div></div><div class="zone-range">141–158</div></div>
-    <div class="zone-row"><div class="zone-name">Z5 VO2max</div><div class="zone-bar-wrap"><div class="zone-bar" style="width:30%;background:#b03030;"></div></div><div class="zone-range">158–176</div></div>
-  </div>
-  <div class="card">
-    <div class="card-title" style="color:var(--pink);">📊 Profil en attente</div>
-    <div class="info-box pink">🌸 Envoie les données Strava pour personnaliser le plan et affiner les analyses IA. En attendant, un plan type est disponible dans l'onglet Plan.</div>
-  </div>
-</div>
-
-<div id="fplan" class="section" style="display:none;">
-  <div class="card">
-    <div class="card-title" style="color:var(--pink);">📅 Plan course à pied — Elisabeth</div>
-    <div class="text-muted" style="margin-bottom:12px;">Elisabeth · 44 ans · 50 kg · Forme générale et endurance · 3 séances/semaine</div>
-    <div id="fweek-grid"></div>
-  </div>
-  <div class="card" id="fday-detail" style="display:none;">
-    <div class="card-title" id="fdetail-title" style="color:var(--pink);"></div>
-    <div id="fdetail-content" style="font-size:14px;line-height:1.9;"></div>
-  </div>
-</div>
-
-<div id="fsortie" class="section" style="display:none;">
-  <div class="card">
-    <div class="card-title" style="color:var(--pink);">📁 Importer depuis Strava ou Garmin</div>
-    <div class="drop-zone" onclick="document.getElementById('ffit-input').click()" style="border-color:#f0c0c8;">
-      <input type="file" id="ffit-input" accept=".fit,.gpx" onchange="handleFileImport(event,'femme')">
-      <div class="drop-icon">🌸</div>
-      <div class="drop-label"><b>Cliquer pour importer un fichier .gpx ou .fit</b><br><span style="font-size:11px;">Strava → Activité → ··· → Exporter GPX</span></div>
-    </div>
-    <div class="import-result" id="fimport-result">
-      <div style="color:var(--sage);font-weight:700;margin-bottom:6px;">✅ Fichier importé</div>
-      <div class="import-fields" id="fimport-fields"></div>
-    </div>
-  </div>
-  <div class="card">
-    <div class="card-title" style="color:var(--pink);">📊 Saisir la sortie</div>
-    <div class="form-grid">
-      <div class="form-group"><label>Date</label><input type="date" id="fs-date"></div>
-      <div class="form-group"><label>Type</label><select id="fs-type"><option value="course">🏃 Course à pied</option><option value="marche">🚶 Marche / Rando</option></select></div>
-      <div class="form-group"><label>Distance (km)</label><input type="number" id="fs-dist" placeholder="8" step="0.1"></div>
-      <div class="form-group"><label>Durée (min)</label><input type="number" id="fs-duree" placeholder="50"></div>
-      <div class="form-group"><label>FC moyenne (bpm)</label><input type="number" id="fs-fc" placeholder="142"></div>
-      <div class="form-group"><label>Dénivelé + (m)</label><input type="number" id="fs-dplus" placeholder="80"></div>
-      <div class="form-group" style="grid-column:1/-1;"><label>Ressenti</label><textarea id="fs-ressenti" rows="2" placeholder="Super sortie, bonne énergie..."></textarea></div>
-    </div>
-    <button class="btn btn-pink" onclick="analyserSortieFemme()">✦ Analyser avec l'IA</button>
-  </div>
-  <div class="card" id="fai-card" style="display:none;">
-    <div class="card-title" style="color:var(--pink);">Analyse Coach</div>
-    <div class="ai-box visible" style="background:linear-gradient(135deg,var(--pink-pale),#fff6f8);border-color:#f0cdd5;">
-      <div class="ai-label" style="color:var(--pink);">✦ FitPlan IA</div>
-      <div id="ai-text-femme" class="ai-thinking">Analyse en cours…</div>
-    </div>
-  </div>
-  <div class="card">
-    <div class="card-title" style="color:var(--pink);">🗂 Historique</div>
-    <div id="fhistory-list"><div class="text-muted">Aucune sortie enregistrée.</div></div>
-  </div>
-</div>
-
-<div id="fpoids" class="section" style="display:none;">
-  <div class="card">
-    <div class="card-title" style="color:var(--pink);">⚖️ Suivi poids</div>
-    <div class="poids-row">
-      <div class="form-group" style="flex:1;"><label>Date</label><input type="date" id="fp-date"></div>
-      <div class="form-group" style="flex:1;"><label>Poids (kg)</label><input type="number" id="fp-val" placeholder="50.0" step="0.1"></div>
-      <button class="btn btn-pink" style="margin-top:22px;" onclick="ajouterPoidsFemme()">+ Ajouter</button>
-    </div>
-  </div>
-  <div class="card">
-    <div class="card-title" style="color:var(--pink);">📉 Courbe</div>
-    <div class="weight-chart" id="fweight-chart"><div class="text-muted" style="margin:auto;">Pas encore de données.</div></div>
-  </div>
-  <div id="fpoids-stats"></div>
-</div>
 
 </div>
 
 <script>
 // ===== STATE =====
 let sorties = [];
-let sortiesFemme = [];
 let poidsData = [];
-let poidsFemme = [];
 let glycoData = [];
 let repasVincent = [];
 let repasElisabeth = [];
 let sb = null;
+let currentUser = null;
+let userProfile = null;
 const today = new Date().toISOString().split('T')[0];
+let POIDS_DEPART = 93;
+let POIDS_OBJECTIF = 83;
+let OBJECTIF_KCAL_USER = 1800;
+
+// ===== AUTH FUNCTIONS =====
+let authMode = 'login';
+function switchAuthTab(mode) {
+  authMode = mode;
+  document.getElementById('auth-tab-login').style.background = mode==='login' ? '#1a5f7a' : 'transparent';
+  document.getElementById('auth-tab-login').style.color = mode==='login' ? '#fff' : '#8a8278';
+  document.getElementById('auth-tab-signup').style.background = mode==='signup' ? '#1a5f7a' : 'transparent';
+  document.getElementById('auth-tab-signup').style.color = mode==='signup' ? '#fff' : '#8a8278';
+}
+
+async function handleAuth() {
+  const email = document.getElementById('auth-email').value.trim();
+  const password = document.getElementById('auth-password').value;
+  const errEl = document.getElementById('auth-error');
+  errEl.style.display = 'none';
+  if (!email || !password) { errEl.textContent = 'Email et mot de passe requis.'; errEl.style.display = 'block'; return; }
+  if (authMode === 'login') {
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) { errEl.textContent = 'Email ou mot de passe incorrect.'; errEl.style.display = 'block'; }
+  } else {
+    const { error } = await sb.auth.signUp({ email, password });
+    if (error) { errEl.textContent = error.message; errEl.style.display = 'block'; }
+    else { errEl.style.color = '#6b8f71'; errEl.textContent = 'Compte créé ! Vérifie tes emails pour confirmer.'; errEl.style.display = 'block'; }
+  }
+}
+
+async function resetPassword() {
+  const email = document.getElementById('auth-email').value.trim();
+  if (!email) { alert('Entre ton email d\'abord.'); return; }
+  await sb.auth.resetPasswordForEmail(email);
+  alert('Email de réinitialisation envoyé !');
+}
+
+async function deconnexion() {
+  await sb.auth.signOut();
+}
+
+function showAuthScreen() {
+  document.getElementById('auth-screen').style.display = 'flex';
+  document.getElementById('onboarding-screen').style.display = 'none';
+  const main = document.querySelector('.main');
+  const hdr = document.querySelector('header');
+  if (main) main.style.display = 'none';
+  if (hdr) hdr.style.display = 'none';
+}
+
+function showApp() {
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('onboarding-screen').style.display = 'none';
+  const main = document.querySelector('.main');
+  const hdr = document.querySelector('header');
+  if (main) main.style.display = '';
+  if (hdr) hdr.style.display = '';
+  const headerUser = document.getElementById('header-user');
+  if (headerUser && userProfile) headerUser.textContent = userProfile.nom;
+  loadAllData();
+}
+
+async function loadUserProfile() {
+  const { data, error } = await sb.from('fitplan_profiles').select('*').eq('id', currentUser.id).single();
+  if (data && !error) {
+    userProfile = data;
+    POIDS_DEPART = userProfile.poids_depart || 93;
+    POIDS_OBJECTIF = userProfile.poids_objectif || 83;
+    OBJECTIF_KCAL_USER = userProfile.objectif_kcal || 1800;
+    showApp();
+  } else {
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('onboarding-screen').style.display = 'block';
+    const main = document.querySelector('.main');
+    const hdr = document.querySelector('header');
+    if (main) main.style.display = 'none';
+    if (hdr) hdr.style.display = 'none';
+  }
+}
+
+async function sauvegarderProfil() {
+  const nom = document.getElementById('ob-nom').value.trim();
+  const age = parseInt(document.getElementById('ob-age').value);
+  const taille = parseInt(document.getElementById('ob-taille').value);
+  const poids = parseFloat(document.getElementById('ob-poids').value);
+  const objectif = parseFloat(document.getElementById('ob-objectif').value);
+  const sexe = document.getElementById('ob-sexe').value;
+  const sport = document.getElementById('ob-sport').value;
+  const kcal = parseInt(document.getElementById('ob-kcal').value) || 1800;
+  if (!nom || !poids || !objectif) { alert('Remplis au moins ton prénom, poids actuel et objectif.'); return; }
+  const fcMax = 220 - (age || 40);
+  const { error } = await sb.from('fitplan_profiles').upsert({
+    id: currentUser.id, nom, age, taille, poids_depart: poids, poids_objectif: objectif,
+    poids_actuel: poids, fc_max: fcMax, sport_principal: sport, sexe, objectif_kcal: kcal
+  });
+  if (!error) {
+    userProfile = { id: currentUser.id, nom, age, taille, poids_depart: poids, poids_objectif: objectif, poids_actuel: poids, fc_max: fcMax, sport_principal: sport, sexe, objectif_kcal: kcal };
+    POIDS_DEPART = poids;
+    POIDS_OBJECTIF = objectif;
+    OBJECTIF_KCAL_USER = kcal;
+    showApp();
+  } else { alert('Erreur: ' + error.message); }
+}
+
+function getProfilContext() {
+  if (!userProfile) return 'Utilisateur, objectif perte de poids';
+  const sport = {velo:'vélo/gravel',course:'course à pied',mixte:'vélo + course',marche:'marche'}[userProfile.sport_principal] || userProfile.sport_principal;
+  return `${userProfile.nom}, ${userProfile.age} ans, ${userProfile.poids_actuel||userProfile.poids_depart} kg (objectif ${userProfile.poids_objectif} kg), sport: ${sport}`;
+}
 
 // ===== SUPABASE =====
 async function initSupabase() {
@@ -870,38 +765,50 @@ async function initSupabase() {
     if (!res.ok) throw new Error('Config unavailable');
     const { url, key } = await res.json();
     sb = supabase.createClient(url, key);
-    await loadAllData();
+
+    sb.auth.onAuthStateChange(async (event, session) => {
+      if (session) {
+        currentUser = session.user;
+        await loadUserProfile();
+      } else {
+        currentUser = null;
+        userProfile = null;
+        showAuthScreen();
+      }
+    });
+
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) {
+      currentUser = session.user;
+      await loadUserProfile();
+    } else {
+      showAuthScreen();
+    }
   } catch(e) {
     console.error('Supabase init failed:', e);
-    // Fallback: l'app fonctionne sans données
-    preloadLibreView();
-    renderPlan(); renderPlanFemme(); renderHistory(); updateDashboard();
+    showAuthScreen();
   }
 }
 
 async function loadAllData() {
-  const [s1, s2, p1, p2, g1, r1, r2] = await Promise.all([
-    sb.from('fitplan_sorties').select('*').eq('who','vincent').order('date', { ascending: false }),
-    sb.from('fitplan_sorties').select('*').eq('who','femme').order('date', { ascending: false }),
-    sb.from('fitplan_poids').select('*').eq('who','vincent').order('date', { ascending: false }),
-    sb.from('fitplan_poids').select('*').eq('who','femme').order('date', { ascending: false }),
-    sb.from('fitplan_glyco').select('*').order('datetime', { ascending: false }),
-    sb.from('fitplan_repas').select('*').eq('who','vincent').order('date', { ascending: false }),
-    sb.from('fitplan_repas').select('*').eq('who','femme').order('date', { ascending: false }),
+  if (!sb || !currentUser) return;
+  const uid = currentUser.id;
+  const [s1, p1, g1, r1] = await Promise.all([
+    sb.from('fitplan_sorties').select('*').eq('user_id', uid).order('date', { ascending: false }),
+    sb.from('fitplan_poids').select('*').eq('user_id', uid).order('date', { ascending: false }),
+    sb.from('fitplan_glyco').select('*').eq('user_id', uid).order('datetime', { ascending: false }),
+    sb.from('fitplan_repas').select('*').eq('user_id', uid).order('date', { ascending: false }),
   ]);
   sorties = s1.data || [];
-  sortiesFemme = s2.data || [];
   poidsData = p1.data || [];
-  poidsFemme = p2.data || [];
   glycoData = (g1.data || []).map(r => ({ date: r.datetime, val: r.val, ctx: r.ctx, note: r.note, id: r.id }));
   repasVincent = (r1.data || []).map(r => ({ date: r.date, type: r.type, description: r.label, kcal: r.kcal||0, proteines: r.proteines||0, glucides: r.glucides||0, lipides: r.lipides||0, conseil: '', score: null, photoThumb: null, id: r.id }));
-  repasElisabeth = (r2.data || []).map(r => ({ date: r.date, type: r.type, description: r.label, kcal: r.kcal||0, proteines: r.proteines||0, glucides: r.glucides||0, lipides: r.lipides||0, conseil: '', score: null, photoThumb: null, id: r.id }));
+  repasElisabeth = [];
   if (glycoData.length === 0) preloadLibreView();
   updateDashboard();
   renderHistory();
   renderPoids();
 }
-const POIDS_DEPART = 93, POIDS_OBJECTIF = 83;
 
 // ===== DATE IN HEADER =====
 (function() {
@@ -913,23 +820,6 @@ const POIDS_DEPART = 93, POIDS_OBJECTIF = 83;
 })();
 
 // ===== NAVIGATION =====
-function switchWho(who, btn) {
-  document.querySelectorAll('.who-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  document.getElementById('tabs-vincent').style.display = who === 'vincent' ? 'flex' : 'none';
-  document.getElementById('tabs-femme').style.display = who === 'femme' ? 'flex' : 'none';
-  document.querySelectorAll('.section').forEach(s => { s.classList.remove('active'); s.style.display = 'none'; });
-  if (who === 'vincent') {
-    document.getElementById('dashboard').style.display = '';
-    document.getElementById('dashboard').classList.add('active');
-    updateDashboard();
-  } else {
-    document.getElementById('fdashboard').style.display = '';
-    document.getElementById('fdashboard').classList.add('active');
-    updateDashboardFemme();
-  }
-}
-
 function showSection(id, e) {
   document.querySelectorAll('#tabs-vincent .tab').forEach(t => t.classList.remove('active'));
   e.target.classList.add('active');
@@ -945,21 +835,6 @@ function showSection(id, e) {
   if (id === 'glycemie') renderGlyco();
   if (id === 'recettes') renderRecipes();
   if (id === 'repas') { initRepasPage('v'); }
-}
-
-function showSectionFemme(id, e) {
-  document.querySelectorAll('#tabs-femme .tab').forEach(t => t.classList.remove('active'));
-  e.target.classList.add('active');
-  e.target.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-  document.querySelectorAll('.section').forEach(s => { s.classList.remove('active'); s.style.display = 'none'; });
-  const el = document.getElementById(id);
-  el.style.display = '';
-  el.classList.add('active');
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-  if (id === 'fpoids') renderPoidsFemme();
-  if (id === 'fdashboard') updateDashboardFemme();
-  if (id === 'fsortie') renderHistoryFemme();
-  if (id === 'frepas') { initRepasPage('e'); }
 }
 
 // ===== PLAN VINCENT =====
@@ -991,34 +866,6 @@ function renderPlan() {
   });
 }
 
-// ===== PLAN FEMME =====
-const planFemme = [
-  { jour: 'Lundi', type: 'repos', label: 'Repos', duree: '—', badge: 'badge-repos', detail: 'Récupération. Marche légère si envie.' },
-  { jour: 'Mardi', type: 'course', label: 'Footing facile Z2', duree: '35–45 min', badge: 'badge-run', detail: '<b>Échauffement</b> : 5 min marche<br><b>Corps</b> : 30–35 min footing Z2 (106–123 bpm) — allure conversationnelle<br><b>Retour au calme</b> : 5 min marche + étirements<br><br>💡 Garde une allure où tu peux parler sans être essoufflée.' },
-  { jour: 'Mercredi', type: 'repos', label: 'Repos actif', duree: 'Libre', badge: 'badge-repos', detail: 'Marche 20–30 min, yoga, étirements.' },
-  { jour: 'Jeudi', type: 'course', label: 'Séance fartlek ou tempo', duree: '40–50 min', badge: 'badge-run', detail: '<b>Échauffement</b> : 8 min footing léger<br><b>Fartlek</b> : accélère 1 min / récup 2 min x 6–8 répétitions<br><b>Retour au calme</b> : 8 min léger<br><br>💡 Si fatiguée, reste en Z2 toute la séance — pas de mal à ça.' },
-  { jour: 'Vendredi', type: 'repos', label: 'Repos', duree: '—', badge: 'badge-repos', detail: 'Repos avant la sortie longue du week-end.' },
-  { jour: 'Samedi', type: 'course', label: 'Sortie longue Z2', duree: '50–70 min', badge: 'badge-run', detail: '<b>Sortie longue facile</b> — distance progressive chaque semaine<br>Rester en Z2 toute la sortie<br>Hydratation dès 40 min<br><br>💡 Cette séance construit l\'endurance et booste le métabolisme.' },
-  { jour: 'Dimanche', type: 'repos', label: 'Repos complet', duree: '—', badge: 'badge-repos', detail: 'Récupération. Prépare la semaine.' },
-];
-
-function renderPlanFemme() {
-  const grid = document.getElementById('fweek-grid');
-  if (!grid) return;
-  grid.innerHTML = '';
-  planFemme.forEach(d => {
-    const row = document.createElement('div');
-    row.className = 'day-row' + (d.type === 'repos' ? ' rest' : '');
-    row.innerHTML = `<div class="day-name">${d.jour}</div><div class="day-type">${d.label}</div><div class="day-meta">${d.duree}</div><span class="badge ${d.badge}">${d.type}</span>`;
-    if (d.type !== 'repos') row.onclick = () => {
-      document.getElementById('fday-detail').style.display = 'block';
-      document.getElementById('fdetail-title').textContent = d.jour + ' — ' + d.label;
-      document.getElementById('fdetail-content').innerHTML = d.detail;
-      document.getElementById('fday-detail').scrollIntoView({ behavior: 'smooth' });
-    };
-    grid.appendChild(row);
-  });
-}
 
 // ===== RECETTES =====
 const recipes = [
@@ -1128,15 +975,14 @@ function handleFileImport(event, who) {
     try { parsed = ext === 'gpx' ? parseGPX(e.target.result) : parseFIT(e.target.result); }
     catch { alert('Erreur de lecture. Essaie en .gpx.'); return; }
     if (!parsed) { alert('Impossible de lire ce fichier.'); return; }
-    const p = who === 'femme' ? 'f' : '';
-    if (parsed.date) document.getElementById(p + 's-date').value = parsed.date;
-    if (parsed.dist) document.getElementById(p + 's-dist').value = parsed.dist;
-    if (parsed.duree) document.getElementById(p + 's-duree').value = parsed.duree;
-    if (parsed.fc) document.getElementById(p + 's-fc').value = parsed.fc;
-    if (parsed.dplus) document.getElementById(p + 's-dplus').value = parsed.dplus;
-    document.getElementById(p + 's-type').value = parsed.type || 'course';
-    const result = document.getElementById(who === 'femme' ? 'fimport-result' : 'import-result');
-    const fields = document.getElementById(who === 'femme' ? 'fimport-fields' : 'import-fields');
+    if (parsed.date) document.getElementById('s-date').value = parsed.date;
+    if (parsed.dist) document.getElementById('s-dist').value = parsed.dist;
+    if (parsed.duree) document.getElementById('s-duree').value = parsed.duree;
+    if (parsed.fc) document.getElementById('s-fc').value = parsed.fc;
+    if (parsed.dplus) document.getElementById('s-dplus').value = parsed.dplus;
+    document.getElementById('s-type').value = parsed.type || 'course';
+    const result = document.getElementById('import-result');
+    const fields = document.getElementById('import-fields');
     result.classList.add('visible');
     fields.innerHTML = [
       parsed.date ? `<div class="import-field">📅 ${parsed.date}</div>` : '',
@@ -1181,39 +1027,20 @@ function analyserSortie() {
   const dplus = parseInt(document.getElementById('s-dplus').value) || 0;
   const ressenti = document.getElementById('s-ressenti').value;
   if (!date || !dist || !duree) { alert('Merci de remplir date, distance et durée.'); return; }
+  const poidsActuel = userProfile ? (userProfile.poids_actuel || userProfile.poids_depart) : 93;
   sorties.push({ date, type, dist, duree, fc: fc || null, dplus, ressenti });
-  if (sb) sb.from('fitplan_sorties').insert({ who: 'vincent', date, type, dist, duree, fc: fc||null, dplus, ressenti }).then(() => {});
+  if (sb && currentUser) sb.from('fitplan_sorties').insert({ user_id: currentUser.id, date, type, dist, duree, fc: fc||null, dplus, ressenti }).then(() => {});
   document.getElementById('ai-card').style.display = 'block';
   document.getElementById('ai-text').textContent = 'Analyse en cours…';
   document.getElementById('ai-text').className = 'ai-thinking';
   document.getElementById('ai-card').scrollIntoView({ behavior: 'smooth' });
-  const fcZone = fc ? (fc<101?'Z1':fc<118?'Z2 endurance (brûle-graisses)':fc<135?'Z3 tempo':fc<152?'Z4 seuil':'Z5 VO2max') : 'inconnue';
+  const fcMax = userProfile?.fc_max || 169;
+  const fcZone = fc ? (fc<fcMax*0.6?'Z1':fc<fcMax*0.7?'Z2 endurance (brûle-graisses)':fc<fcMax*0.8?'Z3 tempo':fc<fcMax*0.9?'Z4 seuil':'Z5 VO2max') : 'inconnue';
   const allure = type==='course'&&dist&&duree ? (duree/dist).toFixed(1)+' min/km' : dist&&duree ? (dist/duree*60).toFixed(1)+' km/h' : '—';
-  const kcal = type==='course' ? Math.round(dist*93*0.9) : Math.round(dist*93*0.5);
-  callAPI(`Coach sportif perte de poids. Vincent, 51 ans, 93 kg (objectif 83), vigneron Hérault, FC max 169 bpm. Sortie : ${type==='course'?'Course':'Vélo/Gravel'} · ${dist} km · ${duree} min · allure ${allure} · FC ${fc?fc+' bpm ('+fcZone+')':'non renseignée'} · D+ ${dplus}m · ressenti : ${ressenti||'non renseigné'} · ~${kcal} kcal. Analyse en 3 parties : 1. Bilan (2 lignes) 2. Point clé FC/allure 3. Conseil pour la prochaine sortie. Français direct, motivant. Max 130 mots.`, 'ai-text');
+  const kcal = type==='course' ? Math.round(dist*poidsActuel*0.9) : Math.round(dist*poidsActuel*0.5);
+  callAPI(`Coach sportif perte de poids. ${getProfilContext()}, FC max ${fcMax} bpm. Sortie : ${type==='course'?'Course':'Vélo/Gravel'} · ${dist} km · ${duree} min · allure ${allure} · FC ${fc?fc+' bpm ('+fcZone+')':'non renseignée'} · D+ ${dplus}m · ressenti : ${ressenti||'non renseigné'} · ~${kcal} kcal. Analyse en 3 parties : 1. Bilan (2 lignes) 2. Point clé FC/allure 3. Conseil pour la prochaine sortie. Français direct, motivant. Max 130 mots.`, 'ai-text');
   renderHistory(); updateDashboard();
   ['s-dist','s-duree','s-fc','s-dplus','s-ressenti'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
-}
-
-function analyserSortieFemme() {
-  const date = document.getElementById('fs-date').value;
-  const type = document.getElementById('fs-type').value;
-  const dist = parseFloat(document.getElementById('fs-dist').value);
-  const duree = parseInt(document.getElementById('fs-duree').value);
-  const fc = parseInt(document.getElementById('fs-fc').value);
-  const dplus = parseInt(document.getElementById('fs-dplus').value) || 0;
-  const ressenti = document.getElementById('fs-ressenti').value;
-  if (!date || !dist || !duree) { alert('Merci de remplir date, distance et durée.'); return; }
-  sortiesFemme.push({ date, type, dist, duree, fc: fc||null, dplus, ressenti });
-  if (sb) sb.from('fitplan_sorties').insert({ who: 'femme', date, type, dist, duree, fc: fc||null, dplus, ressenti }).then(() => {});
-  document.getElementById('fai-card').style.display = 'block';
-  document.getElementById('ai-text-femme').textContent = 'Analyse en cours…';
-  document.getElementById('ai-text-femme').className = 'ai-thinking';
-  document.getElementById('fai-card').scrollIntoView({ behavior: 'smooth' });
-  const fcZone = fc ? (fc<106?'Z1':fc<123?'Z2 endurance':fc<141?'Z3 tempo':fc<158?'Z4 seuil':'Z5 VO2max') : 'inconnue';
-  const allure = type==='course'&&dist&&duree ? (duree/dist).toFixed(1)+' min/km' : '—';
-  callAPI(`Coach running bienveillant. Femme 44 ans, 50 kg, 165 cm, FC max 176 bpm, objectif forme et endurance. Sortie : ${type==='course'?'Course':'Marche'} · ${dist} km · ${duree} min · allure ${allure} · FC ${fc?fc+' bpm ('+fcZone+')':'non renseignée'} · D+ ${dplus}m · ressenti : ${ressenti||'non renseigné'}. Analyse : 1. Bilan (2 lignes) 2. Point clé 3. Conseil prochaine sortie. Français bienveillant et motivant. Max 120 mots.`, 'ai-text-femme');
-  renderHistoryFemme(); updateDashboardFemme();
 }
 
 // ===== HISTORIQUES =====
@@ -1237,13 +1064,9 @@ function histItemHTML(s, index, who) {
 }
 function renderHistory() {
   const list = document.getElementById('history-list');
+  if (!list) return;
   const reversed = [...sorties].reverse();
   list.innerHTML = sorties.length ? reversed.map((s,i) => histItemHTML(s, sorties.length-1-i, 'vincent')).join('') : '<div class="text-muted">Aucune sortie enregistrée.</div>';
-}
-function renderHistoryFemme() {
-  const list = document.getElementById('fhistory-list');
-  const reversed = [...sortiesFemme].reverse();
-  list.innerHTML = sortiesFemme.length ? reversed.map((s,i) => histItemHTML(s, sortiesFemme.length-1-i, 'femme')).join('') : '<div class="text-muted">Aucune sortie enregistrée.</div>';
 }
 
 // ===== POIDS =====
@@ -1251,15 +1074,8 @@ function ajouterPoids() {
   const date = document.getElementById('p-date').value, val = parseFloat(document.getElementById('p-val').value);
   if (!date || !val) { alert('Remplis date et poids.'); return; }
   poidsData.push({ date, val }); poidsData.sort((a,b) => a.date.localeCompare(b.date));
-  if (sb) sb.from('fitplan_poids').insert({ who: 'vincent', date: date, val: val }).then(() => {});
+  if (sb && currentUser) sb.from('fitplan_poids').insert({ user_id: currentUser.id, date: date, val: val }).then(() => {});
   document.getElementById('p-val').value = ''; renderPoids(); updateDashboard();
-}
-function ajouterPoidsFemme() {
-  const date = document.getElementById('fp-date').value, val = parseFloat(document.getElementById('fp-val').value);
-  if (!date || !val) { alert('Remplis date et poids.'); return; }
-  poidsFemme.push({ date, val }); poidsFemme.sort((a,b) => a.date.localeCompare(b.date));
-  if (sb) sb.from('fitplan_poids').insert({ who: 'femme', date: date, val: val }).then(() => {});
-  document.getElementById('fp-val').value = ''; renderPoidsFemme();
 }
 
 function renderPoidsChart(data, chartId, color) {
@@ -1296,24 +1112,6 @@ function renderPoids() {
   stats.innerHTML = `<div class="stats-grid"><div class="stat-box"><div class="stat-val">${last}</div><div class="stat-unit">kg</div><div class="stat-label">Actuel</div></div><div class="stat-box"><div class="stat-val" style="color:var(--sage);">${perdu>0?'-'+perdu:'+'+Math.abs(perdu)}</div><div class="stat-unit">kg</div><div class="stat-label">Perdus</div></div><div class="stat-box"><div class="stat-val" style="color:var(--terra);">${reste}</div><div class="stat-unit">kg</div><div class="stat-label">Avant objectif</div></div><div class="stat-box"><div class="stat-val">${poidsData.length}</div><div class="stat-unit">pesées</div><div class="stat-label">Total</div></div></div>
   <div class="card" style="margin-top:12px;"><div class="card-title">📋 Toutes les pesées</div>${listeHTML}</div>`;
 }
-function renderPoidsFemme() {
-  renderPoidsChart(poidsFemme, 'fweight-chart', 'var(--pink)');
-  const stats = document.getElementById('fpoids-stats');
-  if (!stats || !poidsFemme.length) return;
-  const listeHTML = [...poidsFemme].reverse().map((p, ri) => {
-    const i = poidsFemme.length - 1 - ri;
-    return `<div class="history-item" style="padding:9px 13px;">
-      <div class="h-icon">⚖️</div>
-      <div class="h-info"><div class="h-title">${new Date(p.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'})}</div></div>
-      <div class="h-stats"><div class="h-stat"><div class="h-stat-val">${p.val}</div><div class="h-stat-label">kg</div></div></div>
-      <div class="item-actions">
-        <button class="btn-icon edit" onclick="openModal('poids',${i},'femme')" title="Modifier">✏️</button>
-        <button class="btn-icon del" onclick="deleteEntry('poids',${i},'femme')" title="Supprimer">🗑️</button>
-      </div>
-    </div>`;
-  }).join('');
-  stats.innerHTML = `<div class="card" style="margin-top:12px;"><div class="card-title" style="color:var(--pink);">📋 Toutes les pesées</div>${listeHTML}</div>`;
-}
 
 // ===== GLYCÉMIE =====
 function ajouterGlyco() {
@@ -1324,7 +1122,7 @@ function ajouterGlyco() {
   if (!dt || !val) { alert('Remplis date/heure et valeur.'); return; }
   const g = { date: dt, val, ctx, note };
   glycoData.push(g); glycoData.sort((a,b) => (a.date||a.dt||'').localeCompare(b.date||b.dt||''));
-  if (sb) sb.from('fitplan_glyco').insert({ datetime: dt, val, ctx, note: note||'' }).then(() => {});
+  if (sb && currentUser) sb.from('fitplan_glyco').insert({ user_id: currentUser.id, datetime: dt, val, ctx, note: note||'' }).then(() => {});
   document.getElementById('g-val').value = ''; document.getElementById('g-note').value = '';
   renderGlyco();
 }
@@ -1398,7 +1196,7 @@ function handleCSVImport(event) {
       if (!existingKeys.has(k)) {
         glycoData.push(g);
         existingKeys.add(k);
-        if (sb) sb.from('fitplan_glyco').insert({ datetime: g.dt, val: g.val, ctx: 'import', note: '' }).then(() => {});
+        if (sb && currentUser) sb.from('fitplan_glyco').insert({ user_id: currentUser.id, datetime: g.dt, val: g.val, ctx: 'import', note: '' }).then(() => {});
         imported++;
       }
     });
@@ -1501,10 +1299,11 @@ function genererBilanIA(moment) {
 
   let contextePoids = poidsAujourdhui.length
     ? `Pesée ce matin : ${poidsAujourdhui[0].val} kg`
-    : `Dernier poids connu : ${poidsActuel} kg (objectif 83 kg, départ 93 kg)`;
+    : `Dernier poids connu : ${poidsActuel} kg (objectif ${POIDS_OBJECTIF} kg, départ ${POIDS_DEPART} kg)`;
 
+  const profilCtx = getProfilContext();
   const prompts = {
-    matin: `Tu es coach sport-nutrition. Bilan matinal de Vincent (51 ans, vigneron, objectif perte de poids 93→83 kg).
+    matin: `Tu es coach sport-nutrition. Bilan matinal de ${profilCtx}.
 Données disponibles ce matin :
 - ${contextePoids}
 - ${contexteRepas !== 'Aucun repas enregistré' ? 'Repas hier soir : ' + contexteRepas : 'Pas encore de repas enregistré aujourd\'hui'}
@@ -1516,10 +1315,10 @@ Génère un bilan matin motivant et concret en 3 points :
 3. 📊 Tendance poids (si données disponibles)
 Ton direct, motivant, max 100 mots. Tutoiement.`,
 
-    soir: `Tu es coach sport-nutrition. Bilan de fin de journée de Vincent (51 ans, vigneron, objectif perte de poids 93→83 kg).
+    soir: `Tu es coach sport-nutrition. Bilan de fin de journée de ${profilCtx}.
 Bilan du jour :
 - ${contextePoids}
-- Alimentation : ${contexteRepas} — Total : ${kcalTotal} kcal, ${protTotal}g protéines (objectif 1800 kcal, 150g prot)
+- Alimentation : ${contexteRepas} — Total : ${kcalTotal} kcal, ${protTotal}g protéines (objectif ${OBJECTIF_KCAL_USER} kcal)
 - Sport : ${contexteSorties}
 
 Génère un bilan soir en 3 points :
@@ -1543,7 +1342,6 @@ Ton direct, bienveillant, max 120 mots. Tutoiement.`
 }
 
 function updateDashboard() {
-  // Afficher heure actuelle dans le bilan
   const heureEl = document.getElementById('bilan-heure');
   if (heureEl && !heureEl.textContent) {
     const h = new Date().getHours();
@@ -1559,15 +1357,14 @@ function updateDashboard() {
     document.getElementById('obj-current').textContent = last + ' kg';
     const perdu = POIDS_DEPART - last;
     document.getElementById('dash-perdu').textContent = perdu>0?'-'+perdu.toFixed(1):'0';
-    document.getElementById('obj-bar').style.width = Math.min(100,Math.max(0,(perdu/10)*100)) + '%';
+    const range = POIDS_DEPART - POIDS_OBJECTIF || 10;
+    document.getElementById('obj-bar').style.width = Math.min(100,Math.max(0,(perdu/range)*100)) + '%';
   }
-}
-function updateDashboardFemme() {
-  const km = sortiesFemme.reduce((a,s)=>a+(s.dist||0),0);
-  document.getElementById('fdash-km').textContent = km.toFixed(0);
-  const now = new Date();
-  document.getElementById('fdash-sorties').textContent = sortiesFemme.filter(s=>{ const d=new Date(s.date); return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear(); }).length;
-  if (poidsFemme.length) document.getElementById('fdash-poids').textContent = poidsFemme[poidsFemme.length-1].val;
+  // Mettre à jour le titre objectif avec les valeurs du profil
+  const objCard = document.querySelector('#dashboard .card-title');
+  if (objCard && objCard.textContent.includes('Objectif')) {
+    objCard.textContent = `🎯 Objectif — ${POIDS_DEPART} kg → ${POIDS_OBJECTIF} kg`;
+  }
 }
 
 // ===== MODAL ÉDITION =====
@@ -1580,7 +1377,7 @@ function openModal(type, index, who) {
   overlay.classList.add('open');
 
   if (type === 'sortie') {
-    const data = who === 'femme' ? sortiesFemme : sorties;
+    const data = sorties;
     const s = data[index];
     document.getElementById('modal-title').textContent = 'Modifier la sortie';
     body.innerHTML = `
@@ -1598,7 +1395,7 @@ function openModal(type, index, who) {
         <div class="form-group" style="grid-column:1/-1;"><label>Ressenti</label><textarea id="m-ressenti" rows="2">${s.ressenti||''}</textarea></div>
       </div>`;
   } else if (type === 'poids') {
-    const data = who === 'femme' ? poidsFemme : poidsData;
+    const data = poidsData;
     const p = data[index];
     document.getElementById('modal-title').textContent = 'Modifier le poids';
     body.innerHTML = `
@@ -1635,9 +1432,8 @@ function saveModal() {
   const { type, index, who } = modalCtx;
 
   if (type === 'sortie') {
-    const data = who === 'femme' ? sortiesFemme : sorties;
-    data[index] = {
-      ...data[index],
+    sorties[index] = {
+      ...sorties[index],
       date: document.getElementById('m-date').value,
       type: document.getElementById('m-type').value,
       dist: parseFloat(document.getElementById('m-dist').value),
@@ -1646,20 +1442,19 @@ function saveModal() {
       dplus: parseInt(document.getElementById('m-dplus').value) || 0,
       ressenti: document.getElementById('m-ressenti').value,
     };
-    if (sb && data[index].id) {
-      const item = data[index];
+    if (sb && sorties[index].id) {
+      const item = sorties[index];
       sb.from('fitplan_sorties').update({ date: item.date, type: item.type, dist: item.dist, duree: item.duree, fc: item.fc, dplus: item.dplus, ressenti: item.ressenti }).eq('id', item.id).then(() => {});
     }
-    who === 'femme' ? renderHistoryFemme() : renderHistory();
-    updateDashboard(); updateDashboardFemme();
+    renderHistory();
+    updateDashboard();
   } else if (type === 'poids') {
-    const data = who === 'femme' ? poidsFemme : poidsData;
-    const oldId = data[index].id;
-    data[index] = { ...data[index], date: document.getElementById('m-date').value, val: parseFloat(document.getElementById('m-poids').value) };
-    data.sort((a,b) => a.date.localeCompare(b.date));
-    if (sb && oldId) { sb.from('fitplan_poids').update({ date: data[index].date, val: data[index].val }).eq('id', oldId).then(() => {}); }
-    who === 'femme' ? renderPoidsFemme() : renderPoids();
-    updateDashboard(); updateDashboardFemme();
+    const oldId = poidsData[index].id;
+    poidsData[index] = { ...poidsData[index], date: document.getElementById('m-date').value, val: parseFloat(document.getElementById('m-poids').value) };
+    poidsData.sort((a,b) => a.date.localeCompare(b.date));
+    if (sb && oldId) { sb.from('fitplan_poids').update({ date: poidsData[index].date, val: poidsData[index].val }).eq('id', oldId).then(() => {}); }
+    renderPoids();
+    updateDashboard();
   } else if (type === 'glyco') {
     const oldId = glycoData[index].id;
     const newDt = document.getElementById('m-dt').value;
@@ -1680,24 +1475,22 @@ function saveModal() {
 function deleteEntry(type, index, who) {
   if (!confirm('Supprimer cette entrée ?')) return;
   if (type === 'sortie') {
-    const data = who === 'femme' ? sortiesFemme : sorties;
-    const item = data[index];
+    const item = sorties[index];
     if (sb && item.id) sb.from('fitplan_sorties').delete().eq('id', item.id).then(() => {});
-    data.splice(index, 1);
-    who === 'femme' ? renderHistoryFemme() : renderHistory();
+    sorties.splice(index, 1);
+    renderHistory();
   } else if (type === 'poids') {
-    const data = who === 'femme' ? poidsFemme : poidsData;
-    const item = data[index];
+    const item = poidsData[index];
     if (sb && item.id) sb.from('fitplan_poids').delete().eq('id', item.id).then(() => {});
-    data.splice(index, 1);
-    who === 'femme' ? renderPoidsFemme() : renderPoids();
+    poidsData.splice(index, 1);
+    renderPoids();
   } else if (type === 'glyco') {
     const item = glycoData[index];
     if (sb && item.id) sb.from('fitplan_glyco').delete().eq('id', item.id).then(() => {});
     glycoData.splice(index, 1);
     renderGlyco();
   }
-  updateDashboard(); updateDashboardFemme();
+  updateDashboard();
 }
 
 // Fermer modal en cliquant outside
@@ -1755,7 +1548,7 @@ function refreshRecettes() {
     ? `Nous sommes ${ctx.jourNom} — weekend : repas plus élaborés possibles, plus de temps en cuisine. ${ctx.isWeekend && (ctx.sortieAujourdhui||ctx.sortieJourSuivant) ? 'Grosse sortie sportive au programme.' : ''}`
     : `Nous sommes ${ctx.jourNom} — jour de semaine pour un vigneron actif : repas pratiques, rapides à préparer (max 30 min), nourrissants.`;
 
-  const prompt = `Tu es nutritionniste spécialisé perte de poids. Profil : Vincent, 51 ans, 93 kg (objectif 83), vigneron actif Hérault, IMC 29.4.
+  const prompt = `Tu es nutritionniste spécialisé perte de poids. Profil : ${getProfilContext()}.
 Contexte du jour : ${contexteJour}
 ${contexteSport}
 ${frigoCtx}
@@ -1845,7 +1638,7 @@ function genererRecettesFrigo() {
     return;
   }
 
-  const systemPrompt = `Tu es nutritionniste spécialisé perte de poids. Profil : Vincent, 51 ans, 93 kg, objectif 83 kg, vigneron actif Hérault. Génère 3 recettes originales avec les ingrédients disponibles. Chaque recette : 450–600 kcal, protéines >25g, méditerranéenne. Réponds UNIQUEMENT en JSON sans markdown : [{"titre":"...","emoji":"...","temps":"20 min","kcal":520,"prot":"30g","ingredients":"liste courte","preparation":"étapes courtes"}]`;
+  const systemPrompt = `Tu es nutritionniste spécialisé perte de poids. Profil : ${getProfilContext()}. Génère 3 recettes originales avec les ingrédients disponibles. Chaque recette : 450–600 kcal, protéines >25g, méditerranéenne. Réponds UNIQUEMENT en JSON sans markdown : [{"titre":"...","emoji":"...","temps":"20 min","kcal":520,"prot":"30g","ingredients":"liste courte","preparation":"étapes courtes"}]`;
 
   let messages;
   if (frigoImageBase64) {
@@ -1891,8 +1684,6 @@ let petitDejConfig = JSON.parse(localStorage.getItem('petitDejConfig') || JSON.s
 
 const SLOT_ICONS = { 'petit-dej': '🌅', 'dejeuner': '☀️', 'collation': '🍎', 'diner': '🌙' };
 const SLOT_NAMES = { 'petit-dej': 'Petit-déjeuner', 'dejeuner': 'Déjeuner', 'collation': 'Collation', 'diner': 'Dîner' };
-const OBJECTIF_KCAL = { v: 1800, e: 1600 };
-
 function getTodayStr() { return new Date().toISOString().split('T')[0]; }
 
 let selectedRepasDate = { v: getTodayStr(), e: getTodayStr() };
@@ -1913,8 +1704,7 @@ function changerDateRepas(who, delta) {
 }
 
 function getRepasAujourdhui(who) {
-  const data = who === 'v' ? repasVincent : repasElisabeth;
-  return data.filter(r => r.date === selectedRepasDate[who]);
+  return repasVincent.filter(r => r.date === selectedRepasDate[who]);
 }
 
 function initRepasPage(who) {
@@ -1956,15 +1746,10 @@ function initRepasPage(who) {
 
 function validerPetitDej(who) {
   const cfg = petitDejConfig[who];
-  if (cfg.kcal === 0 && who === 'e') { configurerPetitDej('e'); return; }
+  if (!cfg) return;
   const repas = { date: selectedRepasDate[who]||getTodayStr(), type: 'petit-dej', description: cfg.label, kcal: cfg.kcal, proteines: cfg.proteines, glucides: cfg.glucides, lipides: cfg.lipides, photoThumb: null, conseil: '' };
-  if (who === 'v') {
-    repasVincent.push(repas);
-    if (sb) sb.from('fitplan_repas').insert({ who: 'vincent', date: repas.date, type: repas.type, label: repas.description, kcal: repas.kcal||0, proteines: repas.proteines||0, glucides: repas.glucides||0, lipides: repas.lipides||0 }).then(() => {});
-  } else {
-    repasElisabeth.push(repas);
-    if (sb) sb.from('fitplan_repas').insert({ who: 'femme', date: repas.date, type: repas.type, label: repas.description, kcal: repas.kcal||0, proteines: repas.proteines||0, glucides: repas.glucides||0, lipides: repas.lipides||0 }).then(() => {});
-  }
+  repasVincent.push(repas);
+  if (sb && currentUser) sb.from('fitplan_repas').insert({ user_id: currentUser.id, date: repas.date, type: repas.type, label: repas.description, kcal: repas.kcal||0, proteines: repas.proteines||0, glucides: repas.glucides||0, lipides: repas.lipides||0 }).then(() => {});
   initRepasPage(who);
 }
 
@@ -2054,9 +1839,7 @@ function analyserRepas(who) {
   aiBox.style.display = 'block';
   aiText.innerHTML = '<span class="ai-thinking">Analyse en cours…</span>';
 
-  const profil = who === 'v'
-    ? 'Homme 51 ans, 93 kg, objectif perte de poids, cible 1800 kcal/jour, 150g protéines.'
-    : 'Femme 44 ans, 50 kg, coureuse, cible 1600 kcal/jour, 100g protéines.';
+  const profil = `${getProfilContext()}, objectif perte de poids, cible ${OBJECTIF_KCAL_USER} kcal/jour.`;
 
   const sys = `Tu es nutritionniste. Analyse ce repas pour : ${profil}. Sois indulgent et réaliste — accepte tout type de repas (pizza, bière, fast-food, restes...). Réponds UNIQUEMENT en JSON sans markdown : {"kcal":520,"proteines":32,"glucides":45,"lipides":14,"description":"nom court du repas","conseil":"1 conseil court bienveillant","score":7}`;
 
@@ -2116,13 +1899,8 @@ function saveRepas(who, resStr) {
 }
 
 function doSave(who, repas) {
-  if (who === 'v') {
-    repasVincent.push(repas);
-    if (sb) sb.from('fitplan_repas').insert({ who: 'vincent', date: repas.date, type: repas.type, label: repas.description||'', kcal: repas.kcal||0, proteines: repas.proteines||0, glucides: repas.glucides||0, lipides: repas.lipides||0 }).then(() => {});
-  } else {
-    repasElisabeth.push(repas);
-    if (sb) sb.from('fitplan_repas').insert({ who: 'femme', date: repas.date, type: repas.type, label: repas.description||'', kcal: repas.kcal||0, proteines: repas.proteines||0, glucides: repas.glucides||0, lipides: repas.lipides||0 }).then(() => {});
-  }
+  repasVincent.push(repas);
+  if (sb && currentUser) sb.from('fitplan_repas').insert({ user_id: currentUser.id, date: repas.date, type: repas.type, label: repas.description||'', kcal: repas.kcal||0, proteines: repas.proteines||0, glucides: repas.glucides||0, lipides: repas.lipides||0 }).then(() => {});
   document.getElementById('repas-form-' + who).style.display = 'none';
   renderRepasList(who);
   updateKcalBar(who);
@@ -2130,15 +1908,9 @@ function doSave(who, repas) {
 
 function deleteRepas(who, idx) {
   if (!confirm('Supprimer ce repas ?')) return;
-  if (who === 'v') {
-    const item = repasVincent[idx];
-    if (sb && item.id) sb.from('fitplan_repas').delete().eq('id', item.id).then(() => {});
-    repasVincent.splice(idx,1);
-  } else {
-    const item = repasElisabeth[idx];
-    if (sb && item.id) sb.from('fitplan_repas').delete().eq('id', item.id).then(() => {});
-    repasElisabeth.splice(idx,1);
-  }
+  const item = repasVincent[idx];
+  if (sb && item.id) sb.from('fitplan_repas').delete().eq('id', item.id).then(() => {});
+  repasVincent.splice(idx,1);
   renderRepasList(who);
   updateKcalBar(who);
   initRepasPage(who);
@@ -2148,7 +1920,7 @@ function renderRepasList(who) {
   const list = document.getElementById('repas-list-' + who);
   if (!list) return;
   const today = getRepasAujourdhui(who);
-  const data = who === 'v' ? repasVincent : repasElisabeth;
+  const data = repasVincent;
   if (!today.length) { list.innerHTML = '<div class="text-muted" style="padding:8px 0;">Aucun repas enregistré — tape sur un bouton ci-dessous pour commencer.</div>'; return; }
   list.innerHTML = today.map(r => {
     const realIdx = data.lastIndexOf(r);
@@ -2179,7 +1951,7 @@ function updateKcalBar(who) {
   const prot = today.reduce((a,r) => a+(r.proteines||0), 0);
   const gluc = today.reduce((a,r) => a+(r.glucides||0), 0);
   const lip = today.reduce((a,r) => a+(r.lipides||0), 0);
-  const obj = OBJECTIF_KCAL[who];
+  const obj = OBJECTIF_KCAL_USER;
   const pct = Math.min(100, Math.round(total/obj*100));
   const bar = document.getElementById('kcal-bar-' + who);
   const lbl = document.getElementById('kcal-total-' + who);
@@ -2293,10 +2065,8 @@ function preloadLibreView() {
 // ===== INIT =====
 document.getElementById('s-date').value = today;
 document.getElementById('p-date').value = today;
-document.getElementById('fs-date').value = today;
-document.getElementById('fp-date').value = today;
 document.getElementById('g-datetime').value = today + 'T08:00';
-renderPlan(); renderPlanFemme();
+renderPlan();
 initSupabase();
 </script>
 </body>
