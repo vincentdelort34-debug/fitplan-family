@@ -649,7 +649,8 @@ let supabaseUrl = '';
 let supabaseKey = '';
 let currentUser = null;
 let userProfile = null;
-const today = new Date().toISOString().split('T')[0];
+function getTodayStr() { const d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+const today = getTodayStr();
 let POIDS_DEPART = 93;
 let POIDS_OBJECTIF = 83;
 let OBJECTIF_KCAL_USER = 1800;
@@ -1753,7 +1754,6 @@ let petitDejConfig = JSON.parse(localStorage.getItem('petitDejConfig') || JSON.s
 
 const SLOT_ICONS = { 'petit-dej': '🌅', 'dejeuner': '☀️', 'collation': '🍎', 'diner': '🌙' };
 const SLOT_NAMES = { 'petit-dej': 'Petit-déjeuner', 'dejeuner': 'Déjeuner', 'collation': 'Collation', 'diner': 'Dîner' };
-function getTodayStr() { return new Date().toISOString().split('T')[0]; }
 
 let selectedRepasDate = { v: getTodayStr(), e: getTodayStr() };
 
