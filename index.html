@@ -1974,9 +1974,8 @@ function doSave(who, repas) {
   repasVincent.push(repas);
   if (sb && currentUser) {
     const payload = { user_id: currentUser.id, who: userProfile?.nom || 'user', date: repas.date, type: repas.type, label: repas.description||'', kcal: repas.kcal||0, proteines: repas.proteines||0, glucides: repas.glucides||0, lipides: repas.lipides||0 };
-    sb.from('fitplan_repas').insert(payload).then(({ data, error }) => {
-      if (error) alert('❌ Erreur: ' + error.message + '\nCode: ' + error.code + '\nuser_id: ' + currentUser.id);
-      else alert('✅ Sauvegardé!\nuser_id: ' + currentUser.id + '\ndata: ' + JSON.stringify(data));
+    sb.from('fitplan_repas').insert(payload).then(({ error }) => {
+      if (error) console.error('Erreur save repas:', error.message);
     });
   } else {
     alert('❌ sb=' + !!sb + ' currentUser=' + !!currentUser);
