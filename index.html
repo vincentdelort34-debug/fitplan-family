@@ -1972,7 +1972,14 @@ function saveRepas(who, resStr) {
 
 function doSave(who, repas) {
   repasVincent.push(repas);
-  if (sb && currentUser) sb.from('fitplan_repas').insert({ user_id: currentUser.id, date: repas.date, type: repas.type, label: repas.description||'', kcal: repas.kcal||0, proteines: repas.proteines||0, glucides: repas.glucides||0, lipides: repas.lipides||0 }).then(() => {});
+  if (sb && currentUser) {
+    const payload = { user_id: currentUser.id, date: repas.date, type: repas.type, label: repas.description||'', kcal: repas.kcal||0, proteines: repas.proteines||0, glucides: repas.glucides||0, lipides: repas.lipides||0 };
+    sb.from('fitplan_repas').insert(payload).then(({ error }) => {
+      if (error) alert('❌ Erreur sauvegarde repas:\n' + error.message + '\n\nuser_id: ' + currentUser.id);
+    });
+  } else {
+    alert('❌ sb=' + !!sb + ' currentUser=' + !!currentUser);
+  }
   document.getElementById('repas-form-' + who).style.display = 'none';
   renderRepasList(who);
   updateKcalBar(who);
