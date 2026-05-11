@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FitPlan</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
 <!-- ÉCRAN AUTH SUPABASE -->
 <div id="auth-screen" class="splash">
@@ -394,6 +395,7 @@ select option { background: var(--surface); color: var(--text); }
     <div class="tab" onclick="showSection('repas',event)">🍽 Repas</div>
     <div class="tab" onclick="showSection('recettes',event)">👨‍🍳 Recettes</div>
     <div class="tab" onclick="showSection('poids',event)">⚖️ Poids</div>
+    <div class="tab" onclick="showSection('sante',event)">❤️ Santé</div>
     <div class="tab tab-discrete" onclick="showSection('glycemie',event)">Glycémie</div>
   </div>
 </header>
@@ -715,11 +717,69 @@ select option { background: var(--surface); color: var(--text); }
 </div>
 
 
+<div id="sante" class="section">
+  <!-- BILAN IA SANTÉ -->
+  <div class="card" style="background:linear-gradient(135deg,var(--blue-pale),#fff);">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div class="card-title" style="margin-bottom:0;">✦ Bilan IA santé complet</div>
+      <div style="font-size:11px;color:var(--muted);" id="sante-bilan-heure"></div>
+    </div>
+    <div id="sante-bilan-text" style="font-size:14px;line-height:1.75;color:var(--muted);min-height:32px;">Analyse de ta forme, ton sommeil, ta récupération et tes progrès sur les dernières semaines.</div>
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+      <button class="btn" onclick="analyseSanteIA()" style="margin-top:0;">✦ Analyser ma forme</button>
+      <button class="btn-outline" onclick="analyseSanteIA('progres')" style="margin-top:0;">Mes progrès</button>
+      <button class="btn-outline" onclick="analyseSanteIA('conseils')" style="margin-top:0;">Conseils du coach</button>
+    </div>
+  </div>
+
+  <!-- STAT CARDS -->
+  <div class="card">
+    <div class="card-title">📊 Tes indicateurs clés</div>
+    <div class="stats-grid" id="sante-stats"></div>
+  </div>
+
+  <!-- VO2MAX EVOLUTION -->
+  <div class="card">
+    <div class="card-title">🫁 VO2max — capacité aérobie</div>
+    <div style="position:relative;height:200px;"><canvas id="vo2-chart"></canvas></div>
+    <div style="font-size:12px;color:var(--muted);margin-top:8px;">Course en orange · Vélo en bleu. Garmin met à jour ces valeurs après tes activités cardio avec FC. Norme 50 ans : 35–43 = bon, 44–49 = supérieur, 50+ = excellent.</div>
+  </div>
+
+  <!-- HRV + SOMMEIL -->
+  <div class="card">
+    <div class="card-title">💗 HRV (variabilité cardiaque) & sommeil</div>
+    <div style="position:relative;height:240px;"><canvas id="hrv-chart"></canvas></div>
+    <div style="font-size:12px;color:var(--muted);margin-top:8px;">HRV nocturne en violet (ms) — plus c'est haut, mieux tu récupères. Score de sommeil en vert. Statut HRV : <span id="hrv-status-pill"></span></div>
+  </div>
+
+  <!-- FC REPOS + STRESS + BODY BATTERY -->
+  <div class="card">
+    <div class="card-title">❤️ Cardio repos · stress · énergie</div>
+    <div style="position:relative;height:260px;"><canvas id="recovery-chart"></canvas></div>
+    <div style="font-size:12px;color:var(--muted);margin-top:8px;">FC repos en rouge (objectif &lt; 55 bpm pour un athlète) · stress moyen en orange (échelle 0–100) · body battery max en vert (énergie disponible).</div>
+  </div>
+
+  <!-- TRAINING LOAD HEBDO -->
+  <div class="card">
+    <div class="card-title">🏋️ Charge d'entraînement hebdomadaire</div>
+    <div style="position:relative;height:200px;"><canvas id="load-chart"></canvas></div>
+    <div style="font-size:12px;color:var(--muted);margin-top:8px;">Cumul training load par semaine. Une progression de 5–10 % par semaine est saine. Plus de +30 % par semaine = risque blessure.</div>
+  </div>
+
+  <!-- HISTORIQUE DETAILLE -->
+  <div class="card">
+    <div class="card-title">📋 Détail journalier</div>
+    <div id="sante-list" style="max-height:480px;overflow-y:auto;"></div>
+  </div>
+</div>
+
+
 </div>
 
 <script>
 // ===== STATE =====
 let sorties = [];
+let sante = [];
 let poidsData = [];
 let glycoData = [];
 let repasVincent = [];
@@ -956,13 +1016,15 @@ async function initSupabase() {
 async function loadAllData() {
   if (!sb || !currentUser) return;
   const uid = currentUser.id;
-  const [s1, p1, g1, r1] = await Promise.all([
+  const [s1, p1, g1, r1, sa1] = await Promise.all([
     sb.from('fitplan_sorties').select('*').eq('user_id', uid).order('date', { ascending: false }),
     sb.from('fitplan_poids').select('*').eq('user_id', uid).order('date', { ascending: false }),
     sb.from('fitplan_glyco').select('*').eq('user_id', uid).order('datetime', { ascending: false }),
     sb.from('fitplan_repas').select('*').eq('user_id', uid).order('date', { ascending: false }),
+    sb.from('fitplan_sante').select('*').eq('user_id', uid).order('date', { ascending: true }).then(r => r, () => ({ data: [] })),
   ]);
   sorties = s1.data || [];
+  sante = (sa1 && sa1.data) || [];
   poidsData = p1.data || [];
   glycoData = (g1.data || []).map(r => ({ date: r.datetime, val: r.val, ctx: r.ctx, note: r.note, id: r.id }));
   repasVincent = (r1.data || []).map(r => ({ date: r.date, type: r.type, description: r.label, kcal: r.kcal||0, proteines: r.proteines||0, glucides: r.glucides||0, lipides: r.lipides||0, conseil: '', score: null, photoThumb: null, id: r.id }));
@@ -993,6 +1055,7 @@ function showSection(id, e) {
   el.classList.add('active');
   window.scrollTo({ top: 0, behavior: 'smooth' });
   if (id === 'poids') renderPoids();
+  if (id === 'sante') renderSante();
   if (id === 'dashboard') updateDashboard();
   if (id === 'sortie') renderHistory();
   if (id === 'glycemie') renderGlyco();
@@ -1211,9 +1274,25 @@ function histItemHTML(s, index, who) {
   const icon = s.type==='course'?'🏃':s.type==='marche'?'🚶':'🚴';
   const label = s.type==='course'?'Course':s.type==='marche'?'Marche':'Vélo';
   const allure = s.type==='course'&&s.dist&&s.duree ? (s.duree/s.dist).toFixed(1)+"'/km" : s.dist&&s.duree ? (s.dist/s.duree*60).toFixed(1)+' km/h' : '—';
-  return `<div class="history-item">
+  // Tags enrichis (Garmin)
+  const tags = [];
+  if (s.te_aero != null) tags.push(`<span style="background:var(--blue-pale);color:var(--blue);padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;">TE ${Number(s.te_aero).toFixed(1)}${s.te_anaero!=null&&s.te_anaero>0?'/'+Number(s.te_anaero).toFixed(1):''}${s.te_label?' · '+s.te_label.replace('_',' '):''}</span>`);
+  if (s.training_load != null) tags.push(`<span style="background:var(--bg2);color:var(--text);padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;">Load ${s.training_load}</span>`);
+  if (s.avg_pwr) tags.push(`<span style="background:var(--bg2);color:var(--text);padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;">${s.avg_pwr}W${s.np?' (NP '+s.np+')':''}</span>`);
+  if (s.avg_cad) tags.push(`<span style="background:var(--bg2);color:var(--muted);padding:2px 8px;border-radius:6px;font-size:11px;">Cad ${s.avg_cad}</span>`);
+  if (s.calories) tags.push(`<span style="background:var(--bg2);color:var(--muted);padding:2px 8px;border-radius:6px;font-size:11px;">${s.calories} kcal</span>`);
+  // Mini barre zones FC (si dispo)
+  let zonesBar = '';
+  if (s.z1_pct != null) {
+    const zc = ['#9FE1CB','#5DCAA5','#FAC775','#EF9F27','#D85A30'];
+    const pcts = [s.z1_pct, s.z2_pct, s.z3_pct, s.z4_pct, s.z5_pct].map(v => v||0);
+    zonesBar = `<div style="display:flex;height:6px;border-radius:3px;overflow:hidden;margin-top:6px;" title="Zones FC : Z1 ${pcts[0]}% · Z2 ${pcts[1]}% · Z3 ${pcts[2]}% · Z4 ${pcts[3]}% · Z5 ${pcts[4]}%">
+      ${pcts.map((p,i) => p>0?`<div style="width:${p}%;background:${zc[i]};"></div>`:'').join('')}
+    </div>`;
+  }
+  return `<div class="history-item" style="flex-wrap:wrap;align-items:flex-start;">
     <div class="h-icon">${icon}</div>
-    <div class="h-info"><div class="h-title">${label} · ${new Date(s.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}</div><div class="h-sub">${s.fc?s.fc+' bpm · ':''}${s.dplus?s.dplus+'m D+':''}</div></div>
+    <div class="h-info" style="min-width:120px;"><div class="h-title">${label} · ${new Date(s.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}${s.name?' · '+s.name.replace('Puisserguier ','').replace('Salou ','').replace('Corneilhan ',''):''}</div><div class="h-sub">${s.fc?s.fc+' bpm · ':''}${s.max_hr?'max '+s.max_hr+' · ':''}${s.dplus?s.dplus+'m D+':''}</div></div>
     <div class="h-stats">
       <div class="h-stat"><div class="h-stat-val">${s.dist}</div><div class="h-stat-label">km</div></div>
       <div class="h-stat"><div class="h-stat-val">${s.duree}</div><div class="h-stat-label">min</div></div>
@@ -1223,6 +1302,7 @@ function histItemHTML(s, index, who) {
       <button class="btn-icon edit" onclick="openModal('sortie',${index},'${who}')" title="Modifier">✏️</button>
       <button class="btn-icon del" onclick="deleteEntry('sortie',${index},'${who}')" title="Supprimer">🗑️</button>
     </div>
+    ${tags.length||zonesBar?`<div style="flex-basis:100%;margin-top:8px;">${tags.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;">${tags.join('')}</div>`:''}${zonesBar}</div>`:''}
   </div>`;
 }
 function renderHistory() {
@@ -1240,6 +1320,238 @@ function ajouterPoids() {
   if (sb && currentUser) sb.from('fitplan_poids').insert({ user_id: currentUser.id, date: date, val: val }).then(() => {});
   document.getElementById('p-val').value = ''; renderPoids(); updateDashboard();
 }
+
+
+// ===== SANTÉ — affichage des données fitplan_sante =====
+let _santeCharts = {};
+function _destroyCharts() {
+  Object.values(_santeCharts).forEach(c => { try { c && c.destroy(); } catch(e){} });
+  _santeCharts = {};
+}
+function renderSante() {
+  if (!sante || !sante.length) {
+    document.getElementById('sante-stats').innerHTML = '<div class="text-muted" style="grid-column:1/-1;padding:20px;">Pas encore de données santé. La sync Garmin auto remplit cette section chaque matin.</div>';
+    document.getElementById('sante-list').innerHTML = '';
+    return;
+  }
+  // Trier ASC par date
+  const data = [...sante].sort((a,b) => a.date.localeCompare(b.date));
+  // === STAT CARDS ===
+  const last30 = data.slice(-30);
+  const avg = (arr, key) => { const v = arr.map(d => d[key]).filter(x => x != null && !isNaN(x)); return v.length ? Math.round(v.reduce((a,b)=>a+b,0)/v.length*10)/10 : null; };
+  const lastVal = (key) => { for (let i = data.length-1; i >= 0; i--) if (data[i][key] != null) return data[i][key]; return null; };
+  const vo2Run = lastVal('vo2_run');
+  const vo2Bike = lastVal('vo2_bike');
+  const hrvAvg = avg(last30, 'hrv_last_night');
+  const rhrAvg = avg(last30, 'rhr');
+  const sleepAvg = avg(last30, 'sleep_score');
+  const stressAvg = avg(last30, 'stress_avg');
+  const lastHrvStatus = (() => { for (let i = data.length-1; i >= 0; i--) if (data[i].hrv_status) return data[i].hrv_status; return null; })();
+  const stats = [
+    { label: 'VO2max Course', val: vo2Run || '—', unit: '', sub: vo2Run ? (vo2Run<35?'à travailler':vo2Run<44?'bon':vo2Run<50?'supérieur':'excellent') : 'aucune mesure' },
+    { label: 'VO2max Vélo', val: vo2Bike || '—', unit: '', sub: vo2Bike ? (vo2Bike<35?'à travailler':vo2Bike<44?'bon':vo2Bike<50?'supérieur':'excellent') : 'aucune mesure' },
+    { label: 'HRV nocturne', val: hrvAvg || '—', unit: 'ms', sub: lastHrvStatus ? lastHrvStatus.toLowerCase() : 'moy 30j' },
+    { label: 'FC repos', val: rhrAvg || '—', unit: 'bpm', sub: rhrAvg ? (rhrAvg<55?'bon':rhrAvg<65?'correct':'à surveiller') : 'moy 30j' },
+    { label: 'Sommeil', val: sleepAvg || '—', unit: '/100', sub: sleepAvg ? (sleepAvg<60?'à améliorer':sleepAvg<80?'correct':'bon') : 'moy 30j' },
+    { label: 'Stress', val: stressAvg || '—', unit: '/100', sub: stressAvg ? (stressAvg<25?'détendu':stressAvg<50?'modéré':'élevé') : 'moy 30j' },
+  ];
+  document.getElementById('sante-stats').innerHTML = stats.map(s => `
+    <div class="stat-box"><div class="stat-val">${s.val}</div><div class="stat-unit">${s.unit}</div><div class="stat-label">${s.label}</div><div style="font-size:10px;color:var(--muted);margin-top:2px;">${s.sub}</div></div>
+  `).join('');
+  // Status pill
+  const pill = document.getElementById('hrv-status-pill');
+  if (pill) pill.innerHTML = lastHrvStatus ? `<span style="background:${lastHrvStatus==='BALANCED'?'var(--sage)':lastHrvStatus==='UNBALANCED'?'var(--gold)':'var(--terra)'};color:#fff;padding:2px 8px;border-radius:4px;font-weight:700;font-size:11px;">${lastHrvStatus}</span>` : 'pas de mesure';
+
+  _destroyCharts();
+  const labels = data.map(d => d.date.slice(5)); // MM-DD
+  const isDark = document.documentElement.classList.contains('dark') || matchMedia('(prefers-color-scheme: dark)').matches;
+  const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)';
+  const tickColor = isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.55)';
+  const commonOpts = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top', labels: { font: { size: 11 }, color: tickColor, boxWidth: 12 } } }, scales: { x: { grid: { color: gridColor }, ticks: { color: tickColor, font: { size: 10 }, autoSkip: true, maxTicksLimit: 12 } }, y: { grid: { color: gridColor }, ticks: { color: tickColor, font: { size: 11 } } } } };
+
+  // VO2max chart
+  _santeCharts.vo2 = new Chart(document.getElementById('vo2-chart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Course', data: data.map(d => d.vo2_run), borderColor: '#D85A30', backgroundColor: '#D85A30', spanGaps: true, tension: 0.3, pointRadius: 4 },
+        { label: 'Vélo', data: data.map(d => d.vo2_bike), borderColor: '#378ADD', backgroundColor: '#378ADD', borderDash: [5,5], spanGaps: true, tension: 0.3, pointRadius: 4 }
+      ]
+    },
+    options: { ...commonOpts, scales: { ...commonOpts.scales, y: { ...commonOpts.scales.y, suggestedMin: 30, suggestedMax: 55 } } }
+  });
+  // HRV + Sleep
+  _santeCharts.hrv = new Chart(document.getElementById('hrv-chart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'HRV (ms)', data: data.map(d => d.hrv_last_night), borderColor: '#7F77DD', backgroundColor: '#7F77DD', yAxisID: 'y', tension: 0.25, pointRadius: 2, spanGaps: true },
+        { label: 'Sommeil', data: data.map(d => d.sleep_score), borderColor: '#1D9E75', backgroundColor: '#1D9E75', borderDash: [5,5], yAxisID: 'y1', tension: 0.25, pointRadius: 2, spanGaps: true }
+      ]
+    },
+    options: { ...commonOpts, scales: {
+      x: commonOpts.scales.x,
+      y: { type: 'linear', position: 'left', grid: { color: gridColor }, ticks: { color: tickColor }, title: { display: true, text: 'HRV (ms)', color: tickColor, font: { size: 11 } } },
+      y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false }, ticks: { color: tickColor }, min: 0, max: 100, title: { display: true, text: 'Sommeil', color: tickColor, font: { size: 11 } } }
+    }}
+  });
+  // FC repos + stress + body battery
+  _santeCharts.rec = new Chart(document.getElementById('recovery-chart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'FC repos (bpm)', data: data.map(d => d.rhr), borderColor: '#E24B4A', backgroundColor: '#E24B4A', yAxisID: 'y', tension: 0.25, pointRadius: 2, spanGaps: true },
+        { label: 'Stress moyen', data: data.map(d => d.stress_avg), borderColor: '#EF9F27', backgroundColor: '#EF9F27', borderDash: [5,5], yAxisID: 'y1', tension: 0.25, pointRadius: 2, spanGaps: true },
+        { label: 'Body Battery max', data: data.map(d => d.bb_high), borderColor: '#1D9E75', backgroundColor: '#1D9E75', borderDash: [2,4], yAxisID: 'y1', tension: 0.25, pointRadius: 2, spanGaps: true }
+      ]
+    },
+    options: { ...commonOpts, scales: {
+      x: commonOpts.scales.x,
+      y: { type: 'linear', position: 'left', grid: { color: gridColor }, ticks: { color: tickColor }, suggestedMin: 40, suggestedMax: 70, title: { display: true, text: 'FC repos (bpm)', color: tickColor, font: { size: 11 } } },
+      y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false }, ticks: { color: tickColor }, min: 0, max: 100, title: { display: true, text: 'Stress / BB', color: tickColor, font: { size: 11 } } }
+    }}
+  });
+  // Training load par semaine (depuis sorties)
+  const weekly = {};
+  for (const s of sorties) {
+    if (!s.training_load) continue;
+    const d = new Date(s.date);
+    const onejan = new Date(d.getFullYear(),0,1);
+    const w = Math.ceil((((d - onejan) / 86400000) + onejan.getDay() + 1) / 7);
+    const key = d.getFullYear() + '-S' + String(w).padStart(2,'0');
+    weekly[key] = (weekly[key]||0) + s.training_load;
+  }
+  const wLabels = Object.keys(weekly).sort();
+  _santeCharts.load = new Chart(document.getElementById('load-chart'), {
+    type: 'bar',
+    data: { labels: wLabels, datasets: [{ label: 'Charge cumulée', data: wLabels.map(k => weekly[k]), backgroundColor: '#534AB7' }] },
+    options: { ...commonOpts, plugins: { legend: { display: false } } }
+  });
+
+  // Liste détaillée
+  const recent = [...data].reverse().slice(0, 30);
+  document.getElementById('sante-list').innerHTML = recent.map(d => {
+    const sleepH = d.sleep_sec ? Math.floor(d.sleep_sec/3600) + 'h' + String(Math.round((d.sleep_sec%3600)/60)).padStart(2,'0') : '—';
+    return `<div style="display:grid;grid-template-columns:80px 1fr;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);font-size:12px;">
+      <div style="font-weight:700;color:var(--text);">${new Date(d.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}</div>
+      <div style="color:var(--muted);">
+        ${d.hrv_last_night?'<b style="color:#7F77DD;">HRV '+d.hrv_last_night+'ms</b>'+(d.hrv_status?' ('+d.hrv_status.toLowerCase()+')':'')+' · ':''}
+        ${d.rhr?'FC repos '+d.rhr+' · ':''}
+        ${d.sleep_score?'Sommeil '+d.sleep_score+'/100 ('+sleepH+') · ':''}
+        ${d.stress_avg!=null?'Stress '+d.stress_avg+'/100 · ':''}
+        ${d.bb_high?'BB '+d.bb_low+'→'+d.bb_high+' · ':''}
+        ${d.total_steps?d.total_steps.toLocaleString('fr-FR')+' pas':''}
+        ${d.vo2_run||d.vo2_bike?' · <b>VO2 '+(d.vo2_run||d.vo2_bike)+'</b>':''}
+      </div>
+    </div>`;
+  }).join('') || '<div class="text-muted" style="padding:20px;">Aucune donnée.</div>';
+}
+
+// ===== BILAN IA SANTÉ =====
+function analyseSanteIA(mode) {
+  const target = document.getElementById('sante-bilan-text');
+  target.textContent = 'Analyse en cours…';
+  target.className = 'ai-thinking';
+  document.getElementById('sante-bilan-heure').textContent = new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+
+  // Construire le contexte
+  const data = [...sante].sort((a,b) => a.date.localeCompare(b.date));
+  const last14 = data.slice(-14);
+  const prev14 = data.slice(-28, -14);
+  const avg = (arr, key) => { const v = arr.map(d => d[key]).filter(x => x != null && !isNaN(x)); return v.length ? Math.round(v.reduce((a,b)=>a+b,0)/v.length*10)/10 : null; };
+  const lastNonNull = (key) => { for (let i = data.length-1; i >= 0; i--) if (data[i][key] != null) return data[i][key]; return null; };
+
+  const ctx = {
+    profil: getProfilContext ? getProfilContext() : 'Vincent, 51 ans',
+    periode: `${data[0]?.date} → ${data[data.length-1]?.date}`,
+    nbJours: data.length,
+    nbSorties: sorties.length,
+    derniereSemaine: {
+      hrv: avg(last14, 'hrv_last_night'),
+      rhr: avg(last14, 'rhr'),
+      sleep: avg(last14, 'sleep_score'),
+      stress: avg(last14, 'stress_avg'),
+      bbMax: avg(last14, 'bb_high'),
+      bbMin: avg(last14, 'bb_low'),
+      steps: avg(last14, 'total_steps'),
+    },
+    semainePrecedente: {
+      hrv: avg(prev14, 'hrv_last_night'),
+      rhr: avg(prev14, 'rhr'),
+      sleep: avg(prev14, 'sleep_score'),
+      stress: avg(prev14, 'stress_avg'),
+    },
+    vo2: { run: lastNonNull('vo2_run'), bike: lastNonNull('vo2_bike') },
+    sortiesRecentes: sorties.slice(0, 10).map(s => `${s.date} ${s.type} ${s.dist}km ${s.duree}min TE${s.te_aero||'?'} Load${s.training_load||'?'}`).join(' | '),
+    chargeTotale: sorties.reduce((a,s)=>a+(s.training_load||0),0),
+  };
+
+  let prompt;
+  if (mode === 'progres') {
+    prompt = `Coach sportif & santé pour Vincent (51 ans, objectif perte de poids 93→83 kg, pratique vélo gravel + course).
+Données 14 derniers jours vs 14 jours précédents :
+- HRV nocturne : ${ctx.derniereSemaine.hrv}ms (vs ${ctx.semainePrecedente.hrv}ms)
+- FC repos : ${ctx.derniereSemaine.rhr}bpm (vs ${ctx.semainePrecedente.rhr}bpm)
+- Sommeil : ${ctx.derniereSemaine.sleep}/100 (vs ${ctx.semainePrecedente.sleep}/100)
+- Stress : ${ctx.derniereSemaine.stress}/100 (vs ${ctx.semainePrecedente.stress}/100)
+VO2max actuel : course ${ctx.vo2.run||'?'} · vélo ${ctx.vo2.bike||'?'}
+Sorties totales sur la période : ${ctx.nbSorties}, charge cumulée ${ctx.chargeTotale}.
+
+Analyse les PROGRÈS spécifiques chiffrés en 4 sections courtes :
+1. 📈 Ce qui s'améliore (chiffres précis)
+2. ⚠️ Ce qui régresse ou stagne
+3. 🎯 Objectif réaliste pour les 14 prochains jours
+4. 💡 Une action concrète à mettre en place dès demain
+Français direct, sans jargon excessif. Max 200 mots.`;
+  } else if (mode === 'conseils') {
+    prompt = `Coach sportif & santé pour Vincent (51 ans, FC max 169 bpm, sport vélo + course, perte de poids 93→83 kg).
+État actuel :
+- HRV nocturne moy 14j : ${ctx.derniereSemaine.hrv}ms (statut ${lastNonNull('hrv_status')||'?'})
+- FC repos : ${ctx.derniereSemaine.rhr}bpm
+- Sommeil moy : ${ctx.derniereSemaine.sleep}/100, ${Math.round(((avg(last14,'sleep_sec')||0)/3600)*10)/10}h/nuit
+- Stress moy : ${ctx.derniereSemaine.stress}/100
+- VO2max : course ${ctx.vo2.run||'?'} · vélo ${ctx.vo2.bike||'?'}
+- Volume hebdo moyen : ${Math.round(sorties.filter(s => new Date(s.date) > new Date(Date.now()-14*86400000)).reduce((a,s)=>a+(s.dist||0),0)/2)}km en sorties.
+Dernières sorties : ${ctx.sortiesRecentes}.
+
+Donne 5 conseils PRIORISÉS (du plus important au moins important) pour optimiser sa forme et sa perte de poids cette semaine.
+Chaque conseil : titre court + 1 phrase d'explication + action concrète.
+Français direct, motivant. Max 250 mots.`;
+  } else {
+    prompt = `Coach santé & forme pour Vincent (51 ans, 178cm, objectif perte de poids 93→83 kg, sport vélo gravel + course à pied, FC max 169 bpm).
+Données des 14 derniers jours (sur ${ctx.nbJours} jours total) :
+- HRV nocturne moy : ${ctx.derniereSemaine.hrv}ms (semaine précédente ${ctx.semainePrecedente.hrv}ms) — statut HRV ${lastNonNull('hrv_status')||'?'}
+- FC repos moy : ${ctx.derniereSemaine.rhr}bpm (semaine précédente ${ctx.semainePrecedente.rhr}bpm)
+- Sommeil : ${ctx.derniereSemaine.sleep}/100, environ ${Math.round(((avg(last14,'sleep_sec')||0)/3600)*10)/10}h/nuit
+- Stress moy : ${ctx.derniereSemaine.stress}/100
+- Body Battery : ${ctx.derniereSemaine.bbMin} → ${ctx.derniereSemaine.bbMax}
+- Pas/jour moy : ${Math.round(ctx.derniereSemaine.steps||0).toLocaleString('fr-FR')}
+- VO2max actuel : course ${ctx.vo2.run||'?'} · vélo ${ctx.vo2.bike||'?'}
+- ${ctx.nbSorties} sorties sur la période, charge cumulée ${ctx.chargeTotale}.
+Dernières sorties : ${ctx.sortiesRecentes}.
+
+Fais un BILAN SANTÉ COMPLET et personnalisé en 4 sections :
+1. ✅ CE QUI VA BIEN (2-3 points chiffrés)
+2. ⚠️ CE QUI VA MOINS BIEN (2-3 points chiffrés)
+3. 📈 PROGRÈS DEPUIS LE DÉBUT (compare avec le début de période)
+4. 💡 CONSEIL CLÉ pour les 7 prochains jours
+
+Français direct, ton coach pas culpabilisant, chiffres précis. Max 280 mots.`;
+  }
+
+  fetch('https://viti-tracabilit.vercel.app/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ max_tokens: 2000, messages: [{ role: 'user', content: prompt }] })
+  })
+  .then(r => r.json())
+  .then(d => { target.innerHTML = (d.content?.map(i => i.text||'').join('\n') || 'Erreur.').replace(/\n/g, '<br>'); target.className = ''; })
+  .catch(() => { target.textContent = 'Erreur de connexion à l\'IA.'; target.className = ''; });
+}
+
 
 function renderPoidsChart(data, chartId, color) {
   const chart = document.getElementById(chartId);
