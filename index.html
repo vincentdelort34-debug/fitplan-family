@@ -10,7 +10,7 @@
 <div id="auth-screen" style="position:fixed;inset:0;z-index:9999;background:#1a5f7a;display:flex;align-items:center;justify-content:center;padding:24px;">
   <div style="background:#fff;border-radius:20px;padding:36px 28px;width:100%;max-width:340px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
     <div style="font-family:'Cormorant Garamond',serif;font-size:2rem;font-style:italic;color:#1a5f7a;margin-bottom:6px;">Fit<span style="color:#d4a853;font-style:normal;">Plan</span></div>
-    <div style="font-family:'Nunito',sans-serif;font-size:13px;color:#8a8278;margin-bottom:24px;">Accès privé · Domaine Delort</div>
+    <div style="font-family:'Nunito',sans-serif;font-size:13px;color:#8a8278;margin-bottom:24px;">Suivi forme &amp; santé · ouvert aux proches</div>
     <div style="display:flex;background:#f5f0e8;border-radius:100px;padding:3px;margin-bottom:20px;gap:2px;">
       <button id="auth-tab-login" onclick="switchAuthTab('login')" style="flex:1;padding:8px;border-radius:100px;border:none;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;cursor:pointer;background:#1a5f7a;color:#fff;">Connexion</button>
       <button id="auth-tab-signup" onclick="switchAuthTab('signup')" style="flex:1;padding:8px;border-radius:100px;border:none;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;cursor:pointer;background:transparent;color:#8a8278;">Créer un compte</button>
@@ -781,26 +781,36 @@ async function loadUserProfile() {
 
 async function sauvegarderProfil() {
   const nom = document.getElementById('ob-nom').value.trim();
-  const age = parseInt(document.getElementById('ob-age').value);
-  const taille = parseInt(document.getElementById('ob-taille').value);
+  const ageRaw = parseInt(document.getElementById('ob-age').value);
+  const tailleRaw = parseInt(document.getElementById('ob-taille').value);
   const poids = parseFloat(document.getElementById('ob-poids').value);
   const objectif = parseFloat(document.getElementById('ob-objectif').value);
   const sexe = document.getElementById('ob-sexe').value;
   const sport = document.getElementById('ob-sport').value;
-  const kcal = parseInt(document.getElementById('ob-kcal').value) || 1800;
+  const kcalRaw = parseInt(document.getElementById('ob-kcal').value);
+  // Garde-fous : on remplace NaN par null pour ne pas casser le upsert.
+  const age = Number.isFinite(ageRaw) ? ageRaw : null;
+  const taille = Number.isFinite(tailleRaw) ? tailleRaw : null;
+  const kcal = Number.isFinite(kcalRaw) ? kcalRaw : 1800;
   if (!nom || !poids || !objectif) { alert('Remplis au moins ton prénom, poids actuel et objectif.'); return; }
+  if (!sb || !currentUser || !currentUser.id) { alert('Session perdue, reconnecte-toi.'); return; }
   const fcMax = 220 - (age || 40);
-  const { error } = await sb.from('fitplan_profiles').upsert({
+  const payload = {
     id: currentUser.id, nom, age, taille, poids_depart: poids, poids_objectif: objectif,
     poids_actuel: poids, fc_max: fcMax, sport_principal: sport, sexe, objectif_kcal: kcal
-  });
+  };
+  console.log('[onboarding] upsert payload', payload);
+  const { data, error } = await sb.from('fitplan_profiles').upsert(payload).select().single();
   if (!error) {
-    userProfile = { id: currentUser.id, nom, age, taille, poids_depart: poids, poids_objectif: objectif, poids_actuel: poids, fc_max: fcMax, sport_principal: sport, sexe, objectif_kcal: kcal };
+    userProfile = data || { ...payload };
     POIDS_DEPART = poids;
     POIDS_OBJECTIF = objectif;
     OBJECTIF_KCAL_USER = kcal;
     showApp();
-  } else { alert('Erreur: ' + error.message); }
+  } else {
+    console.error('[onboarding] erreur upsert', error);
+    alert('Onboarding échoué (' + (error.code||'?') + ') : ' + (error.message||'erreur inconnue') + (error.details ? '\n' + error.details : '') + (error.hint ? '\n💡 ' + error.hint : ''));
+  }
 }
 
 function getProfilContext() {
