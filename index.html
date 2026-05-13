@@ -2682,7 +2682,7 @@ async function loadTodayHealth(force) {
 async function loadConnexions() {
   if (!sb || !currentUser) return;
   const uid = currentUser.id;
-  let { data: rows } = await sb.from('user_connections').select('source,status,last_sync_at,last_sync_status,last_sync_error,metadata').eq('user_id', uid);
+  let { data: rows } = await sb.from('user_connections').select('source,status,last_sync_at,last_sync_status,last_sync_error,metadata,credentials').eq('user_id', uid);
   rows = rows || [];
   const byKey = {};
   rows.forEach(r => byKey[r.source] = r);
