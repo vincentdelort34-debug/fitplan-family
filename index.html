@@ -866,6 +866,7 @@ select option { background: var(--surface); color: var(--text); }
 <script>
 // ===== STATE =====
 let sorties = [];
+let workoutsExt = []; // read-only workouts from health_data (Strava, Intervals.icu, etc.)
 let sante = [];
 let santeMulti = []; // health_data_unified pivoted to daily wide rows (multi-source aware)
 let poidsData = [];
@@ -1104,13 +1105,14 @@ async function initSupabase() {
 async function loadAllData() {
   if (!sb || !currentUser) return;
   const uid = currentUser.id;
-  const [s1, p1, g1, r1, sa1, hd1] = await Promise.all([
+  const [s1, p1, g1, r1, sa1, hd1, wk1] = await Promise.all([
     sb.from('fitplan_sorties').select('*').eq('user_id', uid).order('date', { ascending: false }),
     sb.from('fitplan_poids').select('*').eq('user_id', uid).order('date', { ascending: false }),
     sb.from('fitplan_glyco').select('*').eq('user_id', uid).order('datetime', { ascending: false }),
     sb.from('fitplan_repas').select('*').eq('user_id', uid).order('date', { ascending: false }),
     sb.from('fitplan_sante').select('*').eq('user_id', uid).order('date', { ascending: true }).then(r => r, () => ({ data: [] })),
     sb.from('health_data_unified').select('date,metric_type,source,value,unit').eq('user_id', uid).gte('date', new Date(Date.now() - 90*86400000).toISOString().slice(0,10)).order('date', { ascending: true }).then(r => r, () => ({ data: [] })),
+    sb.from('health_data').select('id,date,source,value,unit,metadata,external_id').eq('user_id', uid).eq('metric_type', 'workout').order('date', { ascending: false }).then(r => r, () => ({ data: [] })),
   ]);
   sorties = s1.data || [];
   sante = (sa1 && sa1.data) || [];
@@ -1145,6 +1147,51 @@ async function loadAllData() {
     byDate[row.date]._sources[field] = row.source;
   }
   santeMulti = Object.values(byDate).sort((a,b) => a.date.localeCompare(b.date));
+
+  // Pivot workouts from health_data (Strava, Intervals.icu) into sortie-shaped objects (read-only).
+  // Type mapping: Strava sport_type → our local type for icon/labels.
+  const TYPE_MAP = {
+    Run: 'course', TrailRun: 'course', VirtualRun: 'course',
+    Ride: 'velo', GravelRide: 'velo', MountainBikeRide: 'velo', VirtualRide: 'velo', EBikeRide: 'velo', EMountainBikeRide: 'velo',
+    Walk: 'marche', Hike: 'marche',
+    Swim: 'swim', WeightTraining: 'muscu', Workout: 'muscu',
+  };
+  workoutsExt = (wk1.data || []).map(w => {
+    const m = w.metadata || {};
+    const sportType = m.sport_type || m.type || '';
+    const type = TYPE_MAP[sportType] || (sportType.toLowerCase().includes('ride') ? 'velo' : sportType.toLowerCase().includes('run') ? 'course' : 'velo');
+    return {
+      id: w.id,
+      external_id: w.external_id,
+      _source: w.source,
+      _readonly: true,
+      date: w.date,
+      type,
+      name: m.name || sportType || '',
+      dist: m.distance_m != null ? +(m.distance_m / 1000).toFixed(2) : null,
+      duree: w.value, // already in minutes
+      dplus: m.elevation_gain != null ? Math.round(m.elevation_gain) : null,
+      fc: m.avg_hr ? Math.round(m.avg_hr) : null,
+      max_hr: m.max_hr ? Math.round(m.max_hr) : null,
+      avg_pwr: m.avg_watts ? Math.round(m.avg_watts) : (m.avg_power || null),
+      np: m.weighted_avg_watts ? Math.round(m.weighted_avg_watts) : (m.np || null),
+      ftp: m.ftp || null,
+      calories: m.calories ? Math.round(m.calories) : null,
+      kilojoules: m.kilojoules ? Math.round(m.kilojoules) : null,
+      training_load: m.training_load || m.tss || null,
+      te_aero: m.te_aero || m.aerobic_training_effect || null,
+      te_anaero: m.te_anaero || m.anaerobic_training_effect || null,
+      avg_speed_kmh: m.avg_speed ? +(m.avg_speed * 3.6).toFixed(1) : null,
+      max_speed_kmh: m.max_speed ? +(m.max_speed * 3.6).toFixed(1) : null,
+      z1_pct: m.hr_zones?.z1, z2_pct: m.hr_zones?.z2, z3_pct: m.hr_zones?.z3, z4_pct: m.hr_zones?.z4, z5_pct: m.hr_zones?.z5,
+      kudos: m.kudos_count,
+      trainer: m.trainer,
+      commute: m.commute,
+      strava_id: w.source === 'strava' ? m.id : null,
+      garmin_id: w.source === 'intervals_icu' ? m.id : null,
+      sport_type: sportType,
+    };
+  });
   poidsData = p1.data || [];
   glycoData = (g1.data || []).map(r => ({ date: r.datetime, val: r.val, ctx: r.ctx, note: r.note, id: r.id }));
   repasVincent = (r1.data || []).map(r => ({ date: r.date, type: r.type, description: r.label, kcal: r.kcal||0, proteines: r.proteines||0, glucides: r.glucides||0, lipides: r.lipides||0, conseil: '', score: null, photoThumb: null, id: r.id }));
@@ -1411,26 +1458,77 @@ function histItemHTML(s, index, who) {
       ${pcts.map((p,i) => p>0?`<div style="width:${p}%;background:${zc[i]};"></div>`:'').join('')}
     </div>`;
   }
+  // Source pill for read-only synced workouts (Strava/Intervals.icu)
+  const srcPill = s._source ? `<span style="background:${s._source==='strava'?'#fc4c02':'#534AB7'};color:#fff;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">${s._source==='strava'?'STRAVA':s._source==='intervals_icu'?'INTERVALS':s._source}</span>` : '';
+  // Extra Strava-specific tags
+  if (s.kudos) tags.push(`<span style="background:var(--bg2);color:var(--muted);padding:2px 8px;border-radius:6px;font-size:11px;">👍 ${s.kudos}</span>`);
+  if (s.avg_speed_kmh && (s.type==='velo' || s.type==='marche')) tags.push(`<span style="background:var(--bg2);color:var(--muted);padding:2px 8px;border-radius:6px;font-size:11px;">${s.avg_speed_kmh} km/h moy</span>`);
+  if (s.trainer) tags.push(`<span style="background:var(--bg2);color:var(--muted);padding:2px 8px;border-radius:6px;font-size:11px;">🏠 indoor</span>`);
+  const actions = s._readonly
+    ? `<div class="item-actions"><span style="font-size:10px;color:var(--muted);">read-only</span></div>`
+    : `<div class="item-actions">
+        <button class="btn-icon edit" onclick="openModal('sortie',${index},'${who}')" title="Modifier">✏️</button>
+        <button class="btn-icon del" onclick="deleteEntry('sortie',${index},'${who}')" title="Supprimer">🗑️</button>
+      </div>`;
   return `<div class="history-item" style="flex-wrap:wrap;align-items:flex-start;">
     <div class="h-icon">${icon}</div>
-    <div class="h-info" style="min-width:120px;"><div class="h-title">${label} · ${new Date(s.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}${s.name?' · '+s.name.replace('Puisserguier ','').replace('Salou ','').replace('Corneilhan ',''):''}</div><div class="h-sub">${s.fc?s.fc+' bpm · ':''}${s.max_hr?'max '+s.max_hr+' · ':''}${s.dplus?s.dplus+'m D+':''}</div></div>
+    <div class="h-info" style="min-width:120px;"><div class="h-title">${label} · ${new Date(s.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}${s.name?' · '+s.name.replace('Puisserguier ','').replace('Salou ','').replace('Corneilhan ',''):''} ${srcPill}</div><div class="h-sub">${s.fc?s.fc+' bpm · ':''}${s.max_hr?'max '+s.max_hr+' · ':''}${s.dplus?s.dplus+'m D+':''}</div></div>
     <div class="h-stats">
-      <div class="h-stat"><div class="h-stat-val">${s.dist}</div><div class="h-stat-label">km</div></div>
-      <div class="h-stat"><div class="h-stat-val">${s.duree}</div><div class="h-stat-label">min</div></div>
+      <div class="h-stat"><div class="h-stat-val">${s.dist||'—'}</div><div class="h-stat-label">km</div></div>
+      <div class="h-stat"><div class="h-stat-val">${s.duree||'—'}</div><div class="h-stat-label">min</div></div>
       <div class="h-stat"><div class="h-stat-val">${allure}</div><div class="h-stat-label">allure</div></div>
     </div>
-    <div class="item-actions">
-      <button class="btn-icon edit" onclick="openModal('sortie',${index},'${who}')" title="Modifier">✏️</button>
-      <button class="btn-icon del" onclick="deleteEntry('sortie',${index},'${who}')" title="Supprimer">🗑️</button>
-    </div>
+    ${actions}
     ${tags.length||zonesBar?`<div style="flex-basis:100%;margin-top:8px;">${tags.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;">${tags.join('')}</div>`:''}${zonesBar}</div>`:''}
   </div>`;
 }
 function renderHistory() {
   const list = document.getElementById('history-list');
   if (!list) return;
-  const reversed = [...sorties].reverse();
-  list.innerHTML = sorties.length ? reversed.map((s,i) => histItemHTML(s, sorties.length-1-i, 'vincent')).join('') : '<div class="text-muted">Aucune sortie enregistrée.</div>';
+  // Merge sorties (editable, manual + legacy Cowork) + workoutsExt (read-only, from Strava/Intervals.icu)
+  // Deduplicate by external_id (strava_<id> / intervals_act_<id>) when sortie already has a matching garmin_id/strava_id
+  const sortieKeys = new Set();
+  for (const s of sorties) {
+    if (s.strava_id) sortieKeys.add('strava_' + s.strava_id);
+    if (s.garmin_id) sortieKeys.add('garmin_' + s.garmin_id);
+  }
+  const sortiesIndexed = sorties.map((s, i) => ({ ...s, _idx: i, _readonly: false }));
+  const extDedupe = workoutsExt.filter(w => !sortieKeys.has(w.external_id));
+  const all = [...sortiesIndexed, ...extDedupe].sort((a,b) => b.date.localeCompare(a.date));
+
+  // Optional source filter
+  const filterEl = document.getElementById('hist-source-filter');
+  const filterVal = filterEl ? filterEl.value : 'all';
+  const filtered = filterVal === 'all'
+    ? all
+    : all.filter(s => filterVal === 'manual' ? !s._source : s._source === filterVal);
+
+  // Stats summary
+  const stats = {
+    total: filtered.length,
+    km: filtered.reduce((a,s) => a + (s.dist || 0), 0),
+    minutes: filtered.reduce((a,s) => a + (s.duree || 0), 0),
+    last30: filtered.filter(s => new Date(s.date) > new Date(Date.now() - 30*86400000)).length,
+  };
+  const summary = `<div style="display:flex;gap:16px;flex-wrap:wrap;padding:10px 12px;background:var(--bg2);border-radius:8px;margin-bottom:10px;font-size:13px;">
+    <div><b style="color:var(--text);">${stats.total}</b> <span style="color:var(--muted);">sorties</span></div>
+    <div><b style="color:var(--text);">${Math.round(stats.km)}</b> <span style="color:var(--muted);">km</span></div>
+    <div><b style="color:var(--text);">${Math.round(stats.minutes/60*10)/10}</b> <span style="color:var(--muted);">h cumulées</span></div>
+    <div><b style="color:var(--text);">${stats.last30}</b> <span style="color:var(--muted);">sur 30j</span></div>
+    <div style="margin-left:auto;">
+      <select id="hist-source-filter" onchange="renderHistory()" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--text);">
+        <option value="all"${filterVal==='all'?' selected':''}>Toutes sources</option>
+        <option value="strava"${filterVal==='strava'?' selected':''}>Strava</option>
+        <option value="intervals_icu"${filterVal==='intervals_icu'?' selected':''}>Intervals.icu</option>
+        <option value="manual"${filterVal==='manual'?' selected':''}>Manuelles</option>
+      </select>
+    </div>
+  </div>`;
+
+  const items = filtered.length
+    ? filtered.slice(0, 200).map(s => histItemHTML(s, s._idx != null ? s._idx : -1, 'vincent')).join('')
+    : '<div class="text-muted">Aucune sortie pour ce filtre.</div>';
+  list.innerHTML = summary + items + (filtered.length > 200 ? `<div style="text-align:center;padding:12px;color:var(--muted);font-size:12px;">${filtered.length - 200} plus anciennes non affichées.</div>` : '');
 }
 
 // ===== POIDS =====
