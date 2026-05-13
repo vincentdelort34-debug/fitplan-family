@@ -396,6 +396,7 @@ select option { background: var(--surface); color: var(--text); }
     <div class="tab" onclick="showSection('recettes',event)">👨‍🍳 Recettes</div>
     <div class="tab" onclick="showSection('poids',event)">⚖️ Poids</div>
     <div class="tab" onclick="showSection('sante',event)">❤️ Santé</div>
+    <div class="tab" onclick="showSection('connexions',event)">⚙️ Connexions</div>
     <div class="tab tab-discrete" onclick="showSection('glycemie',event)">Glycémie</div>
   </div>
 </header>
@@ -428,6 +429,16 @@ select option { background: var(--surface); color: var(--text); }
       <button class="btn" style="flex:1;background:var(--gold);box-shadow:0 3px 10px rgba(212,168,83,0.3);" onclick="genererBilanIA('matin')">🌅 Bilan matin</button>
       <button class="btn" style="flex:1;background:var(--blue);" onclick="genererBilanIA('soir')">🌙 Bilan soir</button>
     </div>
+  </div>
+
+  <!-- SANTÉ DU JOUR — Multi-sources via health_data_unified -->
+  <div class="card" id="today-health-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+      <div class="card-title" style="margin-bottom:0;">🌅 Santé ce matin</div>
+      <button class="btn-outline" id="today-health-refresh" onclick="loadTodayHealth(true)" style="font-size:11px;padding:4px 10px;margin-top:0;">↻</button>
+    </div>
+    <div id="today-health-grid" class="text-muted" style="font-size:13px;">Chargement…</div>
+    <div id="today-health-meta" class="text-muted" style="font-size:11px;margin-top:8px;display:none;"></div>
   </div>
 
   <div class="stats-grid">
@@ -773,6 +784,52 @@ select option { background: var(--surface); color: var(--text); }
   </div>
 </div>
 
+<!-- ======= CONNEXIONS ======= -->
+<div id="connexions" class="section">
+
+  <div class="card" style="background:linear-gradient(135deg,var(--blue-pale),#fff);">
+    <div class="card-title">⚙️ Tes sources de données santé</div>
+    <div class="text-muted" style="margin-bottom:0;">Connecte tes apps et montres pour que FitPlan remonte tes activités, sommeil, FC, HRV automatiquement chaque jour.</div>
+  </div>
+
+  <!-- Strava -->
+  <div class="card">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+      <div style="font-size:24px;">🟠</div>
+      <div class="card-title" style="margin-bottom:0;flex:1;">Strava</div>
+      <div id="strava-status-pill" style="font-size:11px;padding:3px 10px;border-radius:12px;background:#eee;color:#666;">…</div>
+    </div>
+    <div id="strava-card-content" class="text-muted" style="font-size:13px;">Chargement…</div>
+  </div>
+
+  <!-- Intervals.icu -->
+  <div class="card">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+      <div style="font-size:24px;">📊</div>
+      <div class="card-title" style="margin-bottom:0;flex:1;">Intervals.icu</div>
+      <div id="intervals-status-pill" style="font-size:11px;padding:3px 10px;border-radius:12px;background:#eee;color:#666;">…</div>
+    </div>
+    <div id="intervals-card-content" class="text-muted" style="font-size:13px;">Chargement…</div>
+  </div>
+
+  <!-- Apple Health -->
+  <div class="card">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+      <div style="font-size:24px;">🍎</div>
+      <div class="card-title" style="margin-bottom:0;flex:1;">Apple Health</div>
+      <div id="apple-status-pill" style="font-size:11px;padding:3px 10px;border-radius:12px;background:#eee;color:#666;">…</div>
+    </div>
+    <div id="apple-card-content" class="text-muted" style="font-size:13px;">Chargement…</div>
+  </div>
+
+  <!-- Sources à venir -->
+  <div class="card">
+    <div class="card-title">⏳ Bientôt</div>
+    <div class="text-muted" style="font-size:13px;">Fitbit · Polar · Garmin Connect API officielle (en attente d'approbation Garmin Developer Program).</div>
+  </div>
+
+</div>
+
 
 </div>
 
@@ -1056,11 +1113,12 @@ function showSection(id, e) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
   if (id === 'poids') renderPoids();
   if (id === 'sante') renderSante();
-  if (id === 'dashboard') updateDashboard();
+  if (id === 'dashboard') { updateDashboard(); loadTodayHealth(); }
   if (id === 'sortie') renderHistory();
   if (id === 'glycemie') renderGlyco();
   if (id === 'recettes') renderRecipes();
   if (id === 'repas') { initRepasPage('v'); }
+  if (id === 'connexions') loadConnexions();
 }
 
 // ===== PLAN VINCENT =====
@@ -2561,12 +2619,211 @@ function toggleTheme() {
   applyTheme(saved || (sysDark ? 'dark' : 'light'));
 })();
 
+// ===== HEALTH DATA UNIFIED (Étape 7) =====
+async function loadTodayHealth(force) {
+  const grid = document.getElementById('today-health-grid');
+  const meta = document.getElementById('today-health-meta');
+  if (!sb || !currentUser) return;
+  if (!grid) return;
+  try {
+    const today = getTodayStr();
+    // Fetch last 2 days to allow fallback when today not yet populated
+    const since = new Date(); since.setDate(since.getDate() - 1);
+    const sinceStr = since.getFullYear()+'-'+String(since.getMonth()+1).padStart(2,'0')+'-'+String(since.getDate()).padStart(2,'0');
+    const { data, error } = await sb.from('health_data_unified')
+      .select('date, metric_type, source, value, unit')
+      .eq('user_id', currentUser.id)
+      .gte('date', sinceStr)
+      .order('date', { ascending: false });
+    if (error) { grid.innerHTML = '<span style="color:var(--danger);">Erreur: ' + error.message + '</span>'; return; }
+    if (!data || !data.length) {
+      grid.innerHTML = 'Aucune donnée santé pour aujourd\'hui ou hier. Configure tes connexions (onglet ⚙️ Connexions).';
+      return;
+    }
+    // Group by date, then metric_type
+    const byDate = {};
+    data.forEach(r => { (byDate[r.date] = byDate[r.date] || {})[r.metric_type] = r; });
+    const dates = Object.keys(byDate).sort().reverse();
+    const dRef = byDate[today] ? today : dates[0];
+    const m = byDate[dRef] || {};
+    const fmtMin = v => v == null ? '—' : Math.floor(v/60) + 'h' + String(v%60).padStart(2,'0');
+    const cell = (icon, label, val, unit, src) => `
+      <div style="background:var(--card,#fff);border:1px solid #e7e1d6;border-radius:10px;padding:10px;display:flex;align-items:center;gap:10px;">
+        <div style="font-size:20px;">${icon}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:11px;color:var(--muted);">${label}</div>
+          <div style="font-family:'DM Mono';font-size:1.1rem;color:var(--text);">${val}<span style="font-size:11px;color:var(--muted);"> ${unit||''}</span></div>
+        </div>
+        ${src ? `<div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;">${src.replace('_icu','').replace('_health','').replace('_',' ').slice(0,8)}</div>` : ''}
+      </div>`;
+    const tiles = [];
+    if (m.sleep_duration) tiles.push(cell('🌙','Sommeil', fmtMin(m.sleep_duration.value), '', m.sleep_duration.source));
+    if (m.sleep_score)    tiles.push(cell('💤','Score sommeil', m.sleep_score.value, '/100', m.sleep_score.source));
+    if (m.resting_hr)     tiles.push(cell('❤️','FC repos', m.resting_hr.value, 'bpm', m.resting_hr.source));
+    if (m.hrv)            tiles.push(cell('📊','HRV', m.hrv.value, 'ms', m.hrv.source));
+    if (m.steps)          tiles.push(cell('👟','Pas', m.steps.value.toLocaleString('fr-FR'), '', m.steps.source));
+    if (m.weight)         tiles.push(cell('⚖️','Poids', m.weight.value, 'kg', m.weight.source));
+    if (m.vo2max)         tiles.push(cell('🫁','VO2 max', m.vo2max.value, 'ml/kg/min', m.vo2max.source));
+    if (m.training_load)  tiles.push(cell('🏋️','Charge', m.training_load.value, '', m.training_load.source));
+    if (!tiles.length) {
+      grid.innerHTML = 'Données existantes mais aucune métrique connue pour ' + dRef + '.';
+      return;
+    }
+    grid.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;">' + tiles.join('') + '</div>';
+    meta.style.display = '';
+    meta.textContent = dRef === today ? 'Données du jour' : 'Données du ' + dRef + ' (aujourd\'hui pas encore sync)';
+  } catch (e) {
+    console.error('[loadTodayHealth]', e);
+    grid.innerHTML = '<span style="color:var(--danger);">' + (e.message || e) + '</span>';
+  }
+}
+
+// ===== CONNEXIONS UI (Étape 6) =====
+async function loadConnexions() {
+  if (!sb || !currentUser) return;
+  const uid = currentUser.id;
+  let { data: rows } = await sb.from('user_connections').select('source,status,last_sync_at,last_sync_status,last_sync_error,metadata').eq('user_id', uid);
+  rows = rows || [];
+  const byKey = {};
+  rows.forEach(r => byKey[r.source] = r);
+  renderStravaCard(byKey.strava);
+  renderIntervalsCard(byKey.intervals_icu);
+  renderAppleCard(byKey.apple_health);
+}
+function pill(elId, status, text) {
+  const el = document.getElementById(elId); if (!el) return;
+  const colors = { active: ['#d4edda','#155724'], error: ['#f8d7da','#721c24'], disabled: ['#eee','#666'], expired: ['#fff3cd','#856404'] };
+  const c = colors[status] || colors.disabled;
+  el.style.background = c[0]; el.style.color = c[1]; el.textContent = text;
+}
+function fmtRelative(iso) {
+  if (!iso) return 'jamais';
+  const d = new Date(iso); const diff = Date.now() - d.getTime();
+  if (diff < 60000) return 'à l\'instant';
+  if (diff < 3600000) return Math.floor(diff/60000) + ' min';
+  if (diff < 86400000) return 'il y a ' + Math.floor(diff/3600000) + 'h';
+  return 'il y a ' + Math.floor(diff/86400000) + 'j';
+}
+function renderStravaCard(c) {
+  const el = document.getElementById('strava-card-content');
+  if (!c) {
+    pill('strava-status-pill','disabled','Non connecté');
+    el.innerHTML = `
+      <p style="margin:0 0 10px;">Connecte ton compte Strava pour récupérer automatiquement toutes tes sorties (vélo, course, trail, gravel) en temps réel via webhook.</p>
+      <a class="btn" href="/api/strava-connect?user=${currentUser.id}" style="background:#fc4c02;color:#fff;display:inline-block;text-decoration:none;">Se connecter avec Strava</a>`;
+    return;
+  }
+  pill('strava-status-pill', c.status, c.status === 'active' ? 'Connecté' : c.status);
+  const athlete = c.metadata && c.metadata.athlete;
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin-bottom:12px;font-size:13px;">
+      ${athlete && athlete.firstname ? `<div style="color:var(--muted);">Compte</div><div>${athlete.firstname||''} ${athlete.lastname||''}</div>` : ''}
+      <div style="color:var(--muted);">Dernière sync</div><div>${fmtRelative(c.last_sync_at)}</div>
+      <div style="color:var(--muted);">Statut</div><div>${c.last_sync_status || '—'}</div>
+      ${c.last_sync_error ? `<div style="color:var(--muted);">Dernière erreur</div><div style="color:var(--danger);">${c.last_sync_error}</div>` : ''}
+    </div>
+    <button class="btn-outline" onclick="syncStravaNow()" style="margin-top:0;">↻ Synchroniser maintenant</button>`;
+}
+function renderIntervalsCard(c) {
+  const el = document.getElementById('intervals-card-content');
+  if (!c) {
+    pill('intervals-status-pill','disabled','Non connecté');
+    el.innerHTML = `
+      <p style="margin:0 0 10px;">Intervals.icu sert de pont entre ta montre et FitPlan : sommeil, FC repos, HRV, VO2max, poids. Connexion par clé API.</p>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">
+        1. Va sur <a href="https://intervals.icu/settings" target="_blank" style="color:var(--blue);">intervals.icu/settings</a><br>
+        2. Section "Paramètres développeur" → clique sur la ligne "Clé API" → bouton "Produire" → recopie la clé
+      </div>
+      <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:2px;">Athlete ID (i123456)</label>
+      <input id="intervals-athlete-id" type="text" placeholder="i193633" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-bottom:8px;font-family:'DM Mono';">
+      <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:2px;">Clé API</label>
+      <input id="intervals-api-key" type="password" placeholder="••••••••••••••••" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-bottom:8px;font-family:'DM Mono';">
+      <button class="btn" onclick="saveIntervalsConnection()" style="margin-top:0;">Connecter Intervals.icu</button>
+      <div id="intervals-form-status" style="font-size:12px;margin-top:8px;"></div>`;
+    return;
+  }
+  pill('intervals-status-pill', c.status, c.status === 'active' ? 'Connecté' : c.status);
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin-bottom:12px;font-size:13px;">
+      <div style="color:var(--muted);">Dernière sync</div><div>${fmtRelative(c.last_sync_at)}</div>
+      <div style="color:var(--muted);">Statut</div><div>${c.last_sync_status || '—'}</div>
+      ${c.last_sync_error ? `<div style="color:var(--muted);">Erreur</div><div style="color:var(--danger);">${c.last_sync_error}</div>` : ''}
+    </div>
+    <button class="btn-outline" onclick="syncIntervalsNow()" style="margin-top:0;">↻ Synchroniser maintenant</button>`;
+}
+function renderAppleCard(c) {
+  const el = document.getElementById('apple-card-content');
+  const tokenStr = c && c.credentials && c.credentials.token ? c.credentials.token : null;
+  if (!c) {
+    pill('apple-status-pill','disabled','Non configuré');
+    el.innerHTML = `<p style="margin:0;">Apple Health se configure via un Raccourci iOS qui pousse les données chaque matin vers FitPlan. Reconnecte-toi pour générer ton token.</p>`;
+    return;
+  }
+  const pillTxt = c.last_sync_at ? 'Actif' : 'En attente';
+  pill('apple-status-pill', c.status, pillTxt);
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin-bottom:12px;font-size:13px;">
+      <div style="color:var(--muted);">Dernière sync</div><div>${fmtRelative(c.last_sync_at)}</div>
+      <div style="color:var(--muted);">Statut</div><div>${c.last_sync_status || 'Pas encore reçu de données du Raccourci iOS'}</div>
+      ${c.last_sync_error ? `<div style="color:var(--muted);">Erreur</div><div style="color:var(--danger);">${c.last_sync_error}</div>` : ''}
+    </div>
+    <div style="background:#f9f9f9;padding:10px;border-radius:8px;margin-bottom:8px;font-size:12px;">
+      <div style="font-weight:600;margin-bottom:4px;">Ton token personnel (à utiliser dans le Raccourci) :</div>
+      <code style="background:#fff;padding:4px 8px;border-radius:4px;display:inline-block;word-break:break-all;font-size:11px;">${tokenStr || '—'}</code>
+    </div>
+    <a class="btn-outline" href="https://github.com/vincentdelort34-debug/fitplan-family/blob/main/docs/apple-health-setup.md" target="_blank" style="text-decoration:none;display:inline-block;margin-top:0;">📖 Guide config Raccourci iOS</a>`;
+}
+async function saveIntervalsConnection() {
+  const status = document.getElementById('intervals-form-status');
+  const aid = document.getElementById('intervals-athlete-id').value.trim();
+  const key = document.getElementById('intervals-api-key').value.trim();
+  if (!aid || !key) { status.innerHTML = '<span style="color:var(--danger);">Renseigne athlete_id ET clé API.</span>'; return; }
+  status.innerHTML = '<span style="color:var(--muted);">Connexion en cours…</span>';
+  try {
+    const session = await sb.auth.getSession();
+    const token = session.data.session && session.data.session.access_token;
+    if (!token) { status.innerHTML = '<span style="color:var(--danger);">Session expirée. Reconnecte-toi.</span>'; return; }
+    const r = await fetch('/api/connections-intervals', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ athlete_id: aid, api_key: key })
+    });
+    const j = await r.json();
+    if (!r.ok) { status.innerHTML = '<span style="color:var(--danger);">' + (j.error || 'Erreur') + '</span>'; return; }
+    status.innerHTML = '<span style="color:var(--success);">✓ Connecté ! Première sync en cours…</span>';
+    setTimeout(() => loadConnexions(), 3000);
+  } catch (e) {
+    status.innerHTML = '<span style="color:var(--danger);">' + e.message + '</span>';
+  }
+}
+async function syncStravaNow() {
+  const session = await sb.auth.getSession();
+  const token = session.data.session && session.data.session.access_token;
+  if (!token) return;
+  await fetch('/api/sync-strava?user=' + currentUser.id + '&days=14', {
+    method: 'POST', headers: { 'Authorization': 'Bearer ' + token }
+  });
+  setTimeout(loadConnexions, 2000);
+}
+async function syncIntervalsNow() {
+  const session = await sb.auth.getSession();
+  const token = session.data.session && session.data.session.access_token;
+  if (!token) return;
+  await fetch('/api/connections-intervals?action=sync', {
+    method: 'POST', headers: { 'Authorization': 'Bearer ' + token }
+  });
+  setTimeout(loadConnexions, 2000);
+}
+
 // ===== INIT =====
 document.getElementById('s-date').value = today;
 document.getElementById('p-date').value = today;
 document.getElementById('g-datetime').value = today + 'T08:00';
 renderPlan();
 initSupabase();
+// After login, also load today's health
+const _origLoadAll = loadAllData;
+loadAllData = async function() { await _origLoadAll.apply(this, arguments); loadTodayHealth(); };
 </script>
 </body>
 </html>
