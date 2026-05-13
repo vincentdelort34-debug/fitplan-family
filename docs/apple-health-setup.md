@@ -43,7 +43,7 @@ Dans l'app **Health Auto Export** :
    - Walking + Running Distance
    - Apple Exercise Time
 7. **Destination** : choisis **REST API** ou **Webhook**
-   - **URL** : `https://fitplan-family.vercel.app/api/sync-apple-health`
+   - **URL** : `https://fitplan-family.vercel.app/api/sync-health`
    - **Method** : `POST`
    - **Headers** : ajoute deux headers
      - `X-User-Token` : `<ton token copié à l'étape 2>`

@@ -816,10 +816,20 @@ select option { background: var(--surface); color: var(--text); }
   <div class="card">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
       <div style="font-size:24px;">🍎</div>
-      <div class="card-title" style="margin-bottom:0;flex:1;">Apple Health</div>
+      <div class="card-title" style="margin-bottom:0;flex:1;">Apple Health (iPhone)</div>
       <div id="apple-status-pill" style="font-size:11px;padding:3px 10px;border-radius:12px;background:#eee;color:#666;">…</div>
     </div>
     <div id="apple-card-content" class="text-muted" style="font-size:13px;">Chargement…</div>
+  </div>
+
+  <!-- Google Health Connect (Android) -->
+  <div class="card">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+      <div style="font-size:24px;">🤖</div>
+      <div class="card-title" style="margin-bottom:0;flex:1;">Health Connect (Android)</div>
+      <div id="ghc-status-pill" style="font-size:11px;padding:3px 10px;border-radius:12px;background:#eee;color:#666;">…</div>
+    </div>
+    <div id="ghc-card-content" class="text-muted" style="font-size:13px;">Chargement…</div>
   </div>
 
   <!-- Fitbit -->
@@ -2709,8 +2719,31 @@ async function loadConnexions() {
   renderStravaCard(byKey.strava);
   renderIntervalsCard(byKey.intervals_icu);
   renderAppleCard(byKey.apple_health);
+  renderHealthConnectCard(byKey.google_health_connect);
   renderFitbitCard(byKey.fitbit);
   renderWithingsCard(byKey.withings);
+}
+function renderHealthConnectCard(c) {
+  const el = document.getElementById('ghc-card-content');
+  const tokenStr = c && c.credentials && c.credentials.token ? c.credentials.token : null;
+  if (!c) {
+    pill('ghc-status-pill','disabled','Non configuré');
+    el.innerHTML = `<p style="margin:0;">Health Connect agrège tes données santé Android (Samsung Health, Garmin Connect, Fitbit, etc.). Reconnecte-toi pour générer ton token.</p>`;
+    return;
+  }
+  const pillTxt = c.last_sync_at ? 'Actif' : 'En attente';
+  pill('ghc-status-pill', c.status, pillTxt);
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin-bottom:12px;font-size:13px;">
+      <div style="color:var(--muted);">Dernière sync</div><div>${fmtRelative(c.last_sync_at)}</div>
+      <div style="color:var(--muted);">Statut</div><div>${c.last_sync_status || 'Pas encore reçu de données'}</div>
+      ${c.last_sync_error ? `<div style="color:var(--muted);">Erreur</div><div style="color:var(--danger);">${c.last_sync_error}</div>` : ''}
+    </div>
+    <div style="background:#f9f9f9;padding:10px;border-radius:8px;margin-bottom:8px;font-size:12px;">
+      <div style="font-weight:600;margin-bottom:4px;">Ton token Android (Health Sync ou Tasker) :</div>
+      <code style="background:#fff;padding:4px 8px;border-radius:4px;display:inline-block;word-break:break-all;font-size:11px;">${tokenStr || '—'}</code>
+    </div>
+    <a class="btn-outline" href="https://github.com/vincentdelort34-debug/fitplan-family/blob/main/docs/google-health-connect-setup.md" target="_blank" style="text-decoration:none;display:inline-block;margin-top:0;">📖 Guide setup Android Health Connect</a>`;
 }
 function renderFitbitCard(c) {
   const el = document.getElementById('fitbit-card-content');
