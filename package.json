@@ -1,0 +1,9 @@
+{
+  "name": "fitplan-family",
+  "version": "1.0.0",
+  "private": true,
+  "description": "FitPlan — fitness & wellness tracking PWA. Frontend single-file (index.html) + Vercel serverless functions.",
+  "dependencies": {
+    "fit-file-parser": "^1.21.4"
+  }
+}

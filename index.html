@@ -1190,6 +1190,8 @@ async function loadAllData() {
       strava_id: w.source === 'strava' ? m.id : null,
       garmin_id: w.source === 'intervals_icu' ? m.id : null,
       sport_type: sportType,
+      pedal_dynamics: m.pedal_dynamics || null, // present when source='garmin_fit'
+      _raw_metadata: m, // for debug / future expansion
     };
   });
   poidsData = p1.data || [];
@@ -1364,7 +1366,8 @@ function handleFileImport(event, who) {
   if (!file) return;
   const ext = file.name.split('.').pop().toLowerCase();
   const reader = new FileReader();
-  reader.onload = function(e) {
+  reader.onload = async function(e) {
+    // Étape 1 : parse client-side rapide pour préremplir le formulaire (FC, dist, etc.)
     let parsed = null;
     try { parsed = ext === 'gpx' ? parseGPX(e.target.result) : parseFIT(e.target.result); }
     catch { alert('Erreur de lecture. Essaie en .gpx.'); return; }
@@ -1386,6 +1389,47 @@ function handleFileImport(event, who) {
       parsed.dplus ? `<div class="import-field">⛰ ${parsed.dplus} m</div>` : '',
       `<div class="import-field">${parsed.type === 'velo' ? '🚴 Vélo' : '🏃 Course'}</div>`
     ].join('');
+
+    // Étape 2 : pour les .fit, upload côté serveur pour parser les pedal dynamics + métriques avancées
+    if (ext === 'fit') {
+      const advField = document.createElement('div');
+      advField.className = 'import-field';
+      advField.style.cssText = 'background:linear-gradient(135deg,rgba(127,119,221,0.1),rgba(83,74,183,0.05));color:var(--text);';
+      advField.innerHTML = '✨ Upload serveur pour métriques avancées (pedal dynamics, NP, IF…)';
+      fields.appendChild(advField);
+      try {
+        // ArrayBuffer → base64
+        const bytes = new Uint8Array(e.target.result);
+        let bin = '';
+        for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+        const b64 = btoa(bin);
+
+        const session = await sb.auth.getSession();
+        const token = session.data.session && session.data.session.access_token;
+        if (!token) { advField.innerHTML = '✨ Session expirée, reconnecte-toi pour upload serveur'; return; }
+
+        const r = await fetch('/api/fit-upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+          body: JSON.stringify({ filename: file.name, data: b64 }),
+        });
+        const j = await r.json();
+        if (j.status === 'ok') {
+          advField.innerHTML = j.pedal_dynamics_present
+            ? '✨ Parser serveur OK · Pedal dynamics extraits ✓ · Sortie enrichie dispo dans l\'historique Sortie'
+            : `✨ Parser serveur OK · ${j.summary?.distance_km || '?'}km, ${j.summary?.duration_min || '?'}min · pas de pedal dynamics dans ce .fit`;
+          advField.style.background = 'linear-gradient(135deg,rgba(99,196,140,0.15),rgba(99,196,140,0.05))';
+          // Refresh data so the new workout shows up
+          if (typeof loadAllData === 'function') loadAllData();
+        } else {
+          advField.innerHTML = '⚠️ Parser serveur: ' + (j.error || 'erreur') + ' (le formulaire est tout de même prérempli ci-dessus)';
+          advField.style.background = 'rgba(255,200,100,0.2)';
+        }
+      } catch (err) {
+        advField.innerHTML = '⚠️ Upload serveur échoué: ' + err.message + ' (le préremplissage local marche quand même)';
+        advField.style.background = 'rgba(255,200,100,0.2)';
+      }
+    }
   };
   if (ext === 'fit') reader.readAsArrayBuffer(file);
   else reader.readAsText(file, 'UTF-8');
@@ -1541,6 +1585,29 @@ async function analyzeWorkout(wkKey, btn) {
   if (s.training_load) lines.push(`Charge d'entraînement : ${s.training_load}`);
   if (s.te_aero) lines.push(`Training Effect aérobie : ${Number(s.te_aero).toFixed(1)}${s.te_anaero ? ` / anaérobie ${Number(s.te_anaero).toFixed(1)}` : ''}`);
   if (s.trainer) lines.push(`Indoor (home trainer)`);
+  // Pedal dynamics (from FIT file upload — Garmin Vector / Rally pedals)
+  const pd = s.pedal_dynamics || (s._raw_metadata && s._raw_metadata.pedal_dynamics);
+  if (pd) {
+    lines.push('--- Pedal dynamics ---');
+    if (pd.avg_left_right_balance != null) lines.push(`Équilibre G/D moy : ${typeof pd.avg_left_right_balance === 'number' ? pd.avg_left_right_balance + '%' : JSON.stringify(pd.avg_left_right_balance)}`);
+    if (pd.avg_left_pco != null || pd.avg_right_pco != null) lines.push(`PCO (Platform Center Offset) : G ${pd.avg_left_pco ?? '?'}mm / D ${pd.avg_right_pco ?? '?'}mm`);
+    if (pd.avg_left_torque_effectiveness != null) lines.push(`Torque Effectiveness : G ${pd.avg_left_torque_effectiveness}% / D ${pd.avg_right_torque_effectiveness}%`);
+    if (pd.avg_left_pedal_smoothness != null) lines.push(`Pedal Smoothness : G ${pd.avg_left_pedal_smoothness}% / D ${pd.avg_right_pedal_smoothness}%`);
+    if (pd.avg_left_power_phase) lines.push(`Power Phase début/fin : G ${JSON.stringify(pd.avg_left_power_phase)} / D ${JSON.stringify(pd.avg_right_power_phase)}`);
+    if (pd.avg_left_power_phase_peak) lines.push(`Power Phase Peak : G ${JSON.stringify(pd.avg_left_power_phase_peak)} / D ${JSON.stringify(pd.avg_right_power_phase_peak)}`);
+  }
+
+  const hasPedalDyn = !!pd;
+  const pedalSection = hasPedalDyn ? `
+
+**🦵 Biomécanique du pédalage**
+ANALYSE FINE des pedal dynamics :
+- Si équilibre G/D présent : normal = 48-52/52-48. >55/45 ou <45/55 = compensation à corriger (cause possible : douleur, déséquilibre musculaire, position selle).
+- PCO (Platform Center Offset) : où l'appui se fait sur la pédale. Élite cycliste = -1 à +5 mm. Au-delà de +8 mm = appui trop externe (varus, Q-factor étroit, cale trop avancée). Compare G et D — asymétrie >5 mm = à investiguer.
+- Torque Effectiveness : % de pédalage qui produit du couple positif. <60% = beaucoup de "frottement" parasite. Élite >75%.
+- Pedal Smoothness : régularité du couple sur le tour. <20% = pédalage par à-coups. Élite >25%.
+- Power Phase (début/fin angles) : où la puissance est appliquée dans le cycle. Début optimal = 330-360° (avant TDC). Fin = 150-180°. Une "phase" trop courte = poussée tardive, manque de pull-up.
+Donne 2-3 observations chiffrées + 1 piste pratique concrète (réglage cales, drills mono-jambe, position selle, etc.).` : '';
 
   const prompt = `Tu es coach sport endurance expérimenté pour ${profil}. Analyse cette sortie comme un vrai coach humain : direct, concret, technique mais accessible.
 
@@ -1549,13 +1616,13 @@ ${lines.join('\n')}
 
 Contexte wellness sur les 7 jours avant la sortie : ${wellnessCtx}
 
-Génère une analyse en 4 sections (mets bien les emojis et titres en gras) :
+Génère une analyse en ${hasPedalDyn ? '5' : '4'} sections (mets bien les emojis et titres en gras) :
 
 **🎯 Type de séance**
 Identifie la nature de la séance (endurance Z2, sweet spot, fractionné court, sortie longue, récupération, etc.) à partir des données. Justifie en 1-2 phrases avec les chiffres.
 
 **📊 Lecture des données clés**
-2-3 observations techniques précises (puissance, distribution FC, intensité). Si tu as la NP et l'avg_pwr, commente le rapport (Variability Index = NP/AP, >1.15 = sortie irrégulière, <1.05 = très régulière). Si tu as les zones HR, dis si l'objectif Z2/Z3/seuil a été tenu.
+2-3 observations techniques précises (puissance, distribution FC, intensité). Si tu as la NP et l'avg_pwr, commente le rapport (Variability Index = NP/AP, >1.15 = sortie irrégulière, <1.05 = très régulière). Si tu as les zones HR, dis si l'objectif Z2/Z3/seuil a été tenu.${pedalSection}
 
 **💡 Ce qui ressort positivement / à améliorer**
 1 point fort + 1 point d'attention concret.
@@ -1563,7 +1630,7 @@ Identifie la nature de la séance (endurance Z2, sweet spot, fractionné court, 
 **🌙 Recommandation récup'**
 Compte tenu de la charge et du wellness, conseille la suite immédiate : récup active, séance facile, possibilité d'enchaîner du qualitatif, vigilance fatigue cumulée, etc.
 
-Max 200 mots au total. Tutoie. Ne fais pas de listes à puces inutiles, écris du texte coach.`;
+Max ${hasPedalDyn ? '320' : '200'} mots au total. Tutoie. Ne fais pas de listes à puces inutiles, écris du texte coach.`;
 
   try {
     const r = await fetch('/api/chat', {
