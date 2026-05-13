@@ -1464,13 +1464,16 @@ function histItemHTML(s, index, who) {
   if (s.kudos) tags.push(`<span style="background:var(--bg2);color:var(--muted);padding:2px 8px;border-radius:6px;font-size:11px;">👍 ${s.kudos}</span>`);
   if (s.avg_speed_kmh && (s.type==='velo' || s.type==='marche')) tags.push(`<span style="background:var(--bg2);color:var(--muted);padding:2px 8px;border-radius:6px;font-size:11px;">${s.avg_speed_kmh} km/h moy</span>`);
   if (s.trainer) tags.push(`<span style="background:var(--bg2);color:var(--muted);padding:2px 8px;border-radius:6px;font-size:11px;">🏠 indoor</span>`);
+  const wkId = s.external_id || s.id || (s.date + '_' + (s.name||index));
+  const analyzeBtn = `<button class="btn-icon" onclick="analyzeWorkout('${wkId}', this)" title="Analyser cette sortie avec l'IA coach" style="background:linear-gradient(135deg,#7F77DD,#534AB7);color:#fff;border:none;">✨</button>`;
   const actions = s._readonly
-    ? `<div class="item-actions"><span style="font-size:10px;color:var(--muted);">read-only</span></div>`
+    ? `<div class="item-actions">${analyzeBtn}<span style="font-size:10px;color:var(--muted);margin-left:6px;">read-only</span></div>`
     : `<div class="item-actions">
+        ${analyzeBtn}
         <button class="btn-icon edit" onclick="openModal('sortie',${index},'${who}')" title="Modifier">✏️</button>
         <button class="btn-icon del" onclick="deleteEntry('sortie',${index},'${who}')" title="Supprimer">🗑️</button>
       </div>`;
-  return `<div class="history-item" style="flex-wrap:wrap;align-items:flex-start;">
+  return `<div class="history-item" data-workout-key="${wkId}" style="flex-wrap:wrap;align-items:flex-start;">
     <div class="h-icon">${icon}</div>
     <div class="h-info" style="min-width:120px;"><div class="h-title">${label} · ${new Date(s.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}${s.name?' · '+s.name.replace('Puisserguier ','').replace('Salou ','').replace('Corneilhan ',''):''} ${srcPill}</div><div class="h-sub">${s.fc?s.fc+' bpm · ':''}${s.max_hr?'max '+s.max_hr+' · ':''}${s.dplus?s.dplus+'m D+':''}</div></div>
     <div class="h-stats">
@@ -1480,7 +1483,105 @@ function histItemHTML(s, index, who) {
     </div>
     ${actions}
     ${tags.length||zonesBar?`<div style="flex-basis:100%;margin-top:8px;">${tags.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;">${tags.join('')}</div>`:''}${zonesBar}</div>`:''}
+    <div class="workout-analysis" data-for="${wkId}" style="display:none;flex-basis:100%;margin-top:10px;padding:12px;background:linear-gradient(135deg,rgba(127,119,221,0.08),rgba(83,74,183,0.04));border-left:3px solid #7F77DD;border-radius:6px;font-size:13px;line-height:1.6;color:var(--text);"></div>
   </div>`;
+}
+
+// === ANALYSE IA D'UNE SORTIE ===
+function _findWorkout(wkKey) {
+  // Try sorties first (editable), then workoutsExt
+  for (const s of sorties)      if ((s.external_id || s.id || (s.date+'_'+(s.name||''))) === wkKey) return s;
+  for (const s of workoutsExt)  if ((s.external_id || s.id || (s.date+'_'+(s.name||''))) === wkKey) return s;
+  return null;
+}
+function _getZoneSummary(s) {
+  if (s.z1_pct == null) return null;
+  return [s.z1_pct, s.z2_pct, s.z3_pct, s.z4_pct, s.z5_pct].map((p,i) => `Z${i+1}:${p||0}%`).join(' ');
+}
+async function analyzeWorkout(wkKey, btn) {
+  const card = btn.closest('.history-item');
+  const out = card.querySelector('.workout-analysis');
+  if (out.style.display !== 'none') { out.style.display = 'none'; return; } // toggle off
+  const s = _findWorkout(wkKey);
+  if (!s) { out.innerHTML = '<span style="color:var(--danger);">Activité introuvable.</span>'; out.style.display = ''; return; }
+  out.style.display = '';
+  out.innerHTML = '<span style="color:var(--muted);">✨ Analyse en cours…</span>';
+
+  // Contexte wellness des 7 derniers jours
+  const wkDate = new Date(s.date);
+  const recent = santeMulti.filter(d => {
+    const dd = new Date(d.date);
+    return dd <= wkDate && dd >= new Date(wkDate.getTime() - 7*86400000);
+  });
+  const avgRecent = (key) => {
+    const vals = recent.map(r => r[key]).filter(v => v != null && !isNaN(v));
+    return vals.length ? Math.round(vals.reduce((a,b)=>a+b,0)/vals.length*10)/10 : null;
+  };
+  const wellnessCtx = [
+    avgRecent('sleep_score') ? `sommeil moy ${avgRecent('sleep_score')}/100` : null,
+    avgRecent('hrv_last_night') ? `HRV moy ${avgRecent('hrv_last_night')}ms` : null,
+    avgRecent('rhr') ? `FC repos moy ${avgRecent('rhr')}bpm` : null,
+  ].filter(Boolean).join(', ') || 'pas de contexte wellness';
+
+  const profil = (typeof getProfilContext === 'function' ? getProfilContext() : 'utilisateur 51 ans, FC max 169 bpm');
+  const zones = _getZoneSummary(s);
+
+  const lines = [];
+  lines.push(`Date : ${new Date(s.date).toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})}`);
+  lines.push(`Type : ${s.name || s.sport_type || s.type}`);
+  if (s.dist) lines.push(`Distance : ${s.dist} km`);
+  if (s.duree) lines.push(`Durée : ${s.duree} min`);
+  if (s.dplus) lines.push(`D+ : ${s.dplus} m`);
+  if (s.fc) lines.push(`FC moy : ${s.fc} bpm${s.max_hr ? ` (max ${s.max_hr})` : ''}`);
+  if (zones) lines.push(`Distribution zones HR : ${zones}`);
+  if (s.avg_pwr) lines.push(`Puissance moy : ${s.avg_pwr} W${s.np ? ` (NP ${s.np} W)` : ''}${s.ftp ? `, FTP ${s.ftp}W → IF ${((s.np||s.avg_pwr)/s.ftp).toFixed(2)}` : ''}`);
+  if (s.kilojoules) lines.push(`Travail mécanique : ${s.kilojoules} kJ`);
+  if (s.avg_speed_kmh) lines.push(`Vitesse moy : ${s.avg_speed_kmh} km/h${s.max_speed_kmh ? `, max ${s.max_speed_kmh}` : ''}`);
+  if (s.calories) lines.push(`Calories : ${s.calories} kcal`);
+  if (s.training_load) lines.push(`Charge d'entraînement : ${s.training_load}`);
+  if (s.te_aero) lines.push(`Training Effect aérobie : ${Number(s.te_aero).toFixed(1)}${s.te_anaero ? ` / anaérobie ${Number(s.te_anaero).toFixed(1)}` : ''}`);
+  if (s.trainer) lines.push(`Indoor (home trainer)`);
+
+  const prompt = `Tu es coach sport endurance expérimenté pour ${profil}. Analyse cette sortie comme un vrai coach humain : direct, concret, technique mais accessible.
+
+Données de la sortie :
+${lines.join('\n')}
+
+Contexte wellness sur les 7 jours avant la sortie : ${wellnessCtx}
+
+Génère une analyse en 4 sections (mets bien les emojis et titres en gras) :
+
+**🎯 Type de séance**
+Identifie la nature de la séance (endurance Z2, sweet spot, fractionné court, sortie longue, récupération, etc.) à partir des données. Justifie en 1-2 phrases avec les chiffres.
+
+**📊 Lecture des données clés**
+2-3 observations techniques précises (puissance, distribution FC, intensité). Si tu as la NP et l'avg_pwr, commente le rapport (Variability Index = NP/AP, >1.15 = sortie irrégulière, <1.05 = très régulière). Si tu as les zones HR, dis si l'objectif Z2/Z3/seuil a été tenu.
+
+**💡 Ce qui ressort positivement / à améliorer**
+1 point fort + 1 point d'attention concret.
+
+**🌙 Recommandation récup'**
+Compte tenu de la charge et du wellness, conseille la suite immédiate : récup active, séance facile, possibilité d'enchaîner du qualitatif, vigilance fatigue cumulée, etc.
+
+Max 200 mots au total. Tutoie. Ne fais pas de listes à puces inutiles, écris du texte coach.`;
+
+  try {
+    const r = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ max_tokens: 600, messages: [{ role: 'user', content: prompt }] })
+    });
+    const d = await r.json();
+    const text = (d.content && d.content[0] && d.content[0].text) || d.error || 'Erreur de génération.';
+    // Format markdown-ish in HTML
+    const html = text
+      .replace(/\*\*([^\n*]+)\*\*/g, '<b>$1</b>')
+      .replace(/\n\n/g, '</p><p style="margin:8px 0 0;">')
+      .replace(/\n/g, '<br>');
+    out.innerHTML = `<p style="margin:0;">${html}</p>`;
+  } catch (e) {
+    out.innerHTML = `<span style="color:var(--danger);">Erreur : ${e.message}</span>`;
+  }
 }
 function renderHistory() {
   const list = document.getElementById('history-list');
