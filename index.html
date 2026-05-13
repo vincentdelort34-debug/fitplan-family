@@ -822,10 +822,30 @@ select option { background: var(--surface); color: var(--text); }
     <div id="apple-card-content" class="text-muted" style="font-size:13px;">Chargement…</div>
   </div>
 
+  <!-- Fitbit -->
+  <div class="card">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+      <div style="font-size:24px;">⌚</div>
+      <div class="card-title" style="margin-bottom:0;flex:1;">Fitbit</div>
+      <div id="fitbit-status-pill" style="font-size:11px;padding:3px 10px;border-radius:12px;background:#eee;color:#666;">…</div>
+    </div>
+    <div id="fitbit-card-content" class="text-muted" style="font-size:13px;">Chargement…</div>
+  </div>
+
+  <!-- Withings -->
+  <div class="card">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+      <div style="font-size:24px;">⚖️</div>
+      <div class="card-title" style="margin-bottom:0;flex:1;">Withings</div>
+      <div id="withings-status-pill" style="font-size:11px;padding:3px 10px;border-radius:12px;background:#eee;color:#666;">…</div>
+    </div>
+    <div id="withings-card-content" class="text-muted" style="font-size:13px;">Chargement…</div>
+  </div>
+
   <!-- Sources à venir -->
   <div class="card">
     <div class="card-title">⏳ Bientôt</div>
-    <div class="text-muted" style="font-size:13px;">Fitbit · Polar · Garmin Connect API officielle (en attente d'approbation Garmin Developer Program).</div>
+    <div class="text-muted" style="font-size:13px;">Polar Flow · Coros · Suunto · Whoop · Oura · Garmin Connect API officielle (en attente d'approbation Garmin Developer Program).</div>
   </div>
 
 </div>
@@ -2689,6 +2709,60 @@ async function loadConnexions() {
   renderStravaCard(byKey.strava);
   renderIntervalsCard(byKey.intervals_icu);
   renderAppleCard(byKey.apple_health);
+  renderFitbitCard(byKey.fitbit);
+  renderWithingsCard(byKey.withings);
+}
+function renderFitbitCard(c) {
+  const el = document.getElementById('fitbit-card-content');
+  if (!c) {
+    pill('fitbit-status-pill','disabled','Non connecté');
+    el.innerHTML = `
+      <p style="margin:0 0 10px;">Connecte ton Fitbit (Sense, Charge, Versa, Inspire) pour récupérer automatiquement sommeil, FC repos, HRV, pas, poids et VO2 max.</p>
+      <a class="btn" href="/api/fitbit-connect?user=${currentUser.id}" style="background:#00B0B9;color:#fff;display:inline-block;text-decoration:none;">Se connecter avec Fitbit</a>
+      <div style="font-size:11px;color:var(--muted);margin-top:8px;">Si "Fitbit not configured" apparaît, c'est qu'il faut d'abord enregistrer une app Fitbit Dev — voir docs/fitbit-setup.md</div>`;
+    return;
+  }
+  pill('fitbit-status-pill', c.status, c.status === 'active' ? 'Connecté' : c.status);
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin-bottom:12px;font-size:13px;">
+      <div style="color:var(--muted);">Dernière sync</div><div>${fmtRelative(c.last_sync_at)}</div>
+      <div style="color:var(--muted);">Statut</div><div>${c.last_sync_status || '—'}</div>
+      ${c.last_sync_error ? `<div style="color:var(--muted);">Erreur</div><div style="color:var(--danger);">${c.last_sync_error}</div>` : ''}
+    </div>
+    <button class="btn-outline" onclick="syncFitbitNow()" style="margin-top:0;">↻ Synchroniser maintenant</button>`;
+}
+function renderWithingsCard(c) {
+  const el = document.getElementById('withings-card-content');
+  if (!c) {
+    pill('withings-status-pill','disabled','Non connecté');
+    el.innerHTML = `
+      <p style="margin:0 0 10px;">Connecte ton compte Withings (Body+, ScanWatch, Sleep Analyzer, BPM) pour récupérer poids/composition corporelle, sommeil, activités, tension.</p>
+      <a class="btn" href="/api/withings-connect?user=${currentUser.id}" style="background:#00ADCC;color:#fff;display:inline-block;text-decoration:none;">Se connecter avec Withings</a>
+      <div style="font-size:11px;color:var(--muted);margin-top:8px;">Si "Withings not configured", il faut d'abord enregistrer une app — voir docs/withings-setup.md</div>`;
+    return;
+  }
+  pill('withings-status-pill', c.status, c.status === 'active' ? 'Connecté' : c.status);
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin-bottom:12px;font-size:13px;">
+      <div style="color:var(--muted);">Dernière sync</div><div>${fmtRelative(c.last_sync_at)}</div>
+      <div style="color:var(--muted);">Statut</div><div>${c.last_sync_status || '—'}</div>
+      ${c.last_sync_error ? `<div style="color:var(--muted);">Erreur</div><div style="color:var(--danger);">${c.last_sync_error}</div>` : ''}
+    </div>
+    <button class="btn-outline" onclick="syncWithingsNow()" style="margin-top:0;">↻ Synchroniser maintenant</button>`;
+}
+async function syncFitbitNow() {
+  const session = await sb.auth.getSession();
+  const token = session.data.session && session.data.session.access_token;
+  if (!token) return;
+  await fetch('/api/sync-fitbit?user=' + currentUser.id + '&days=7', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } });
+  setTimeout(loadConnexions, 2000);
+}
+async function syncWithingsNow() {
+  const session = await sb.auth.getSession();
+  const token = session.data.session && session.data.session.access_token;
+  if (!token) return;
+  await fetch('/api/sync-withings?user=' + currentUser.id + '&days=7', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } });
+  setTimeout(loadConnexions, 2000);
 }
 function pill(elId, status, text) {
   const el = document.getElementById(elId); if (!el) return;

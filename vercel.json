@@ -3,13 +3,9 @@
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
   "crons": [
-    {
-      "path": "/api/sync-intervals",
-      "schedule": "0 6 * * *"
-    },
-    {
-      "path": "/api/sync-strava?days=7",
-      "schedule": "30 6 * * *"
-    }
+    { "path": "/api/sync-intervals",          "schedule": "0 6 * * *" },
+    { "path": "/api/sync-strava?days=7",      "schedule": "30 6 * * *" },
+    { "path": "/api/sync-fitbit?days=7",      "schedule": "0 7 * * *" },
+    { "path": "/api/sync-withings?days=7",    "schedule": "30 7 * * *" }
   ]
 }

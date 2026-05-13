@@ -1,119 +1,105 @@
-# Apple Health → FitPlan : configuration du Raccourci iOS
+# Apple Health → FitPlan — Méthode recommandée
 
-Une fois par jour, un Raccourci iOS lit tes données Santé Apple sur ton iPhone, et fait un POST vers `https://fitplan-family.vercel.app/api/sync-apple-health`. Les données arrivent dans la table `health_data` de FitPlan en quelques secondes.
+Apple a verrouillé l'app Raccourcis pour la lecture massive de données Santé sur iOS récent. **La voie fiable aujourd'hui** est l'app **Health Auto Export** sur l'App Store — 3 € one-shot, taillée pour ça : elle lit toutes tes données Apple Health et les POST automatiquement vers un endpoint webhook chaque matin (ou à l'intervalle que tu veux).
 
-**Ton token personnel** (à utiliser dans le Raccourci) :
+Si tu utilises déjà Garmin/Strava/Intervals.icu, **Apple Health est optionnel** (les données sont déjà dans FitPlan via les autres sources). Apple Health est utile surtout pour les utilisateurs iPhone-only ou Apple Watch sans Garmin.
+
+---
+
+## Étape 1 — Installer Health Auto Export
+
+1. App Store sur ton iPhone → cherche **"Health Auto Export"** (auteur Lybron Sobers, icône cardiogramme bleu/vert)
+2. Achète l'app (3 € en achat unique, pas d'abonnement)
+3. Ouvre-la, accepte de lire toutes les données Santé qu'elle propose
+
+## Étape 2 — Récupérer ton token FitPlan
+
+Ouvre FitPlan dans Safari → onglet **⚙️ Connexions** → carte **🍎 Apple Health**.
+Ton token personnel est affiché dedans, du genre :
 
 ```
 6T97cMsPpexpSJrbM93SnARrv2PbV4QS
 ```
 
-Ce token est unique à toi, déjà enregistré dans la base FitPlan (`user_connections`). Garde-le secret — c'est lui qui prouve à l'API que c'est ton iPhone qui pousse les données.
+Copie-le.
+
+## Étape 3 — Configurer le webhook dans Health Auto Export
+
+Dans l'app **Health Auto Export** :
+
+1. **Automations** (icône en bas) → **Add Automation**
+2. **Frequency** : Daily (chaque jour)
+3. **Time** : `7:00 AM`
+4. **Format** : **JSON**
+5. **Aggregate** : **Daily**
+6. **Data Types** : sélectionne au minimum :
+   - Step Count
+   - Active Energy
+   - Heart Rate Resting (Resting Heart Rate)
+   - Heart Rate Variability
+   - Sleep Analysis
+   - Body Mass (Weight)
+   - VO2 Max
+   - Walking + Running Distance
+   - Apple Exercise Time
+7. **Destination** : choisis **REST API** ou **Webhook**
+   - **URL** : `https://fitplan-family.vercel.app/api/sync-apple-health`
+   - **Method** : `POST`
+   - **Headers** : ajoute deux headers
+     - `X-User-Token` : `<ton token copié à l'étape 2>`
+     - `Content-Type` : `application/json`
+8. Sauvegarde
+
+## Étape 4 — Tester immédiatement
+
+Dans Health Auto Export, ouvre l'automatisation et tape **"Run Now"** (ou Export Now). Tu devrais voir un message de succès `inserted: N rows` ou similaire.
+
+Vérification côté FitPlan : retourne sur l'onglet ⚙️ Connexions, recharge la page → la carte Apple Health passe en **"Connecté"** avec `Dernière sync à l'instant`.
+
+## Étape 5 — C'est fait
+
+À partir de demain matin 7h, Health Auto Export envoie automatiquement tes données du jour. La carte Apple Health dans FitPlan se met à jour seule, et la vue unifiée `health_data_unified` combinera les données Apple avec celles de Strava/Intervals.icu en privilégiant la source la plus fiable par métrique.
 
 ---
 
-## 1. Créer le Raccourci
+## Alternative gratuite (limitée) — Raccourci iOS
 
-Sur ton iPhone, ouvre l'app **Raccourcis** → onglet **Mes raccourcis** → **+** en haut à droite.
+Si tu veux pas payer 3 €, tu peux faire un Raccourci iOS qui POST un dictionnaire JSON avec quelques métriques basiques (pas, calories actives, dernier poids). Apple a hélas restreint les types lisibles par Shortcuts récemment (sommeil, FC repos, HRV pas accessibles directement sur iOS 17+ via Shortcuts).
 
-Nomme le raccourci **"FitPlan Santé daily sync"**.
+Le endpoint `/api/sync-apple-health` accepte ces 2 formats :
 
-### Étape A — Lire les valeurs Santé Apple
-
-Ajoute ces actions, l'une après l'autre. Tu trouves "Obtenir l'échantillon le plus récent" dans l'app Recherche du panneau d'actions, catégorie **Santé**.
-
-Pour chaque action de type "Obtenir l'échantillon le plus récent de l'état de santé" :
-
-| # | Action | Type de donnée | Paramètres |
-|---|---|---|---|
-| 1 | Obtenir l'échantillon le plus récent | **Sommeil – Analyse du sommeil** | Dernières 24h, total en **minutes** |
-| 2 | Obtenir l'échantillon le plus récent | **FC au repos** | Dernière valeur |
-| 3 | Obtenir l'échantillon le plus récent | **Variabilité de la fréquence cardiaque** | Dernière valeur (en ms) |
-| 4 | Obtenir l'échantillon le plus récent | **Pas** | Aujourd'hui, somme |
-| 5 | Obtenir l'échantillon le plus récent | **Énergie active** | Aujourd'hui, somme (kcal) |
-| 6 | Obtenir l'échantillon le plus récent | **Étages montés** | Aujourd'hui, somme |
-| 7 | Obtenir l'échantillon le plus récent | **Poids** | Dernière valeur (kg) — optionnel |
-| 8 | Obtenir l'échantillon le plus récent | **VO2 max** | Dernière valeur — optionnel |
-
-Juste après chaque action, ajoute **"Définir une variable"** :
-
-| Variable | Valeur |
-|---|---|
-| `Sommeil_min` | Résultat de l'action 1 |
-| `RHR` | Résultat de l'action 2 |
-| `HRV` | Résultat de l'action 3 |
-| `Pas` | Résultat de l'action 4 |
-| `Kcal` | Résultat de l'action 5 |
-| `Etages` | Résultat de l'action 6 |
-| `Poids` | Résultat de l'action 7 |
-| `VO2` | Résultat de l'action 8 |
-
-### Étape B — Construire le dictionnaire JSON
-
-Ajoute l'action **"Dictionnaire"** et configure-le comme ceci :
-
+**Format simple (Raccourci iOS)** :
+```json
+{
+  "date": "2026-05-13",
+  "metrics": {
+    "sleep_minutes": 425, "resting_hr": 52, "hrv": 38, "steps": 8543,
+    "active_calories": 412, "weight_kg": 91.2, "vo2max": 40
+  }
+}
 ```
-date            : (laisse vide — le serveur prendra aujourd'hui en heure de Paris)
-metrics         : (Sous-dictionnaire ↓)
-  sleep_minutes    : variable Sommeil_min
-  resting_hr       : variable RHR
-  hrv              : variable HRV
-  steps            : variable Pas
-  active_calories  : variable Kcal
-  floors_climbed   : variable Etages
-  weight_kg        : variable Poids
-  vo2max           : variable VO2
+
+**Format Health Auto Export** :
+```json
+{
+  "data": {
+    "metrics": [
+      { "name": "step_count", "data": [{ "date": "...", "qty": 8543 }] },
+      { "name": "sleep_analysis", "data": [{ "sleepEnd": "...", "asleep": 25500 }] }
+    ]
+  }
+}
 ```
 
-### Étape C — POST vers FitPlan
-
-Ajoute l'action **"Obtenir le contenu de l'URL"** avec ces paramètres :
-
-- **URL** : `https://fitplan-family.vercel.app/api/sync-apple-health`
-- **Méthode** : POST
-- **En-têtes** :
-  - `X-User-Token` : `6T97cMsPpexpSJrbM93SnARrv2PbV4QS`
-  - `Content-Type` : `application/json`
-- **Corps de la requête** : Type **JSON**, contenu = le dictionnaire de l'étape B
-
-### Étape D — Afficher la réponse (optionnel, pour vérifier)
-
-Ajoute **"Afficher la notification"** avec comme contenu le résultat de l'action C. Tu verras `{"status":"ok","inserted":8}` (ou pareil).
-
----
-
-## 2. Tester le Raccourci une fois
-
-Appuie sur le bouton **▶︎** en haut du raccourci pour le lancer maintenant. La première fois, iOS te demande l'autorisation de lire les données Santé : accepte tout.
-
-Tu devrais voir une notification de succès avec `inserted: N`.
-
-Vérification côté FitPlan : dans Supabase Studio → table `health_data` → filtre `source = apple_health` → tu vois tes lignes du jour. Ou plus tard via l'écran "Connexions" de FitPlan.
-
----
-
-## 3. Automatiser tous les matins
-
-Dans l'app Raccourcis :
-
-1. Onglet **Automatisation** (en bas)
-2. **+** en haut à droite → **Créer une automatisation personnelle**
-3. **Heure du jour** → règle sur **7:00**
-4. **Tous les jours** coché → **Suivant**
-5. **+ Ajouter une action** → cherche **"Exécuter le raccourci"** → choisis **FitPlan Santé daily sync**
-6. **Suivant** → **désactive** "Demander avant d'exécuter" (sinon ça nécessite ton accord chaque matin)
-7. **OK**
-
-Voilà, à partir de demain matin 7h, ton iPhone pousse automatiquement vers FitPlan.
+Recommandation : **paye les 3 € pour Health Auto Export**, c'est de loin la solution la plus fiable et complète.
 
 ---
 
 ## Dépannage
 
-**"Token invalide"** → vérifie que tu as bien copié `6T97cMsPpexpSJrbM93SnARrv2PbV4QS` dans le header X-User-Token (avec les majuscules exactes).
-
-**"inserted: 0"** → la requête est arrivée mais aucune métrique reconnue. Vérifie les clés du dictionnaire (elles doivent être exactement `sleep_minutes`, `resting_hr`, `hrv`, etc.).
-
-**Le Raccourci ne se déclenche pas tout seul** → vérifie dans Réglages iOS → Raccourcis → autorisations, et désactive bien "Demander avant d'exécuter" dans l'automatisation.
-
-**Tu veux re-tester sans attendre demain** → bouton ▶︎ dans le raccourci, ou demande à Siri : "FitPlan Santé daily sync".
+| Erreur | Solution |
+|---|---|
+| `{"error":"missing_token"}` | Header `X-User-Token` absent ou mal écrit (respecte la casse) |
+| `{"error":"invalid_token"}` | Token ne correspond pas à un compte FitPlan. Vérifie en recopiant depuis l'onglet Connexions |
+| `inserted: 0` | Aucune métrique reconnue. Vérifie que tu coches bien des "Data Types" dans HAE |
+| Pas de webhook reçu | Health Auto Export → onglet Logs → vérifie qu'il n'y a pas d'erreur HTTP |
