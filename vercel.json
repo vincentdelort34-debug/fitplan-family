@@ -1,1 +1,15 @@
-{ "rewrites": [{ "source": "/((?!api/).*)", "destination": "/index.html" }] }
+{
+  "rewrites": [
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ],
+  "crons": [
+    {
+      "path": "/api/sync-intervals",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/sync-strava?days=7",
+      "schedule": "30 6 * * *"
+    }
+  ]
+}

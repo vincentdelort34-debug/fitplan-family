@@ -902,7 +902,7 @@ function showApp() {
 }
 
 async function loadUserProfile() {
-  const { data, error } = await sb.from('fitplan_profiles').select('*').eq('id', currentUser.id).single();
+  const { data, error } = await sb.from('fitplan_profils').select('*').eq('id', currentUser.id).single();
   if (data && !error) {
     userProfile = data;
     POIDS_DEPART = userProfile.poids_depart || 93;
@@ -940,7 +940,7 @@ async function sauvegarderProfil() {
     poids_actuel: poids, fc_max: fcMax, sport_principal: sport, sexe, objectif_kcal: kcal
   };
   console.log('[onboarding] upsert payload', payload);
-  const { data, error } = await sb.from('fitplan_profiles').upsert(payload).select().single();
+  const { data, error } = await sb.from('fitplan_profils').upsert(payload).select().single();
   if (!error) {
     userProfile = data || { ...payload };
     POIDS_DEPART = poids;
