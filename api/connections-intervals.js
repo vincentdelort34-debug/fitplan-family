@@ -63,7 +63,7 @@ export default async function handler(req, res) {
   // ?action=sync → trigger sync for this user
   if (req.method === 'POST' && req.query.action === 'sync') {
     try {
-      const r = await fetch(`${SITE_URL}/api/sync-intervals`, {
+      const r = await fetch(`${SITE_URL}/api/sync?provider=intervals_icu&user=${userId}&days=14`, {
         method:  'POST',
         headers: { 'Authorization': `Bearer ${CRON_SECRET || ''}` },
       });
@@ -132,7 +132,7 @@ export default async function handler(req, res) {
   }
 
   // Fire-and-forget initial sync
-  fetch(`${SITE_URL}/api/sync-intervals`, {
+  fetch(`${SITE_URL}/api/sync?provider=intervals_icu&user=${userId}&days=14`, {
     method:  'POST',
     headers: { 'Authorization': `Bearer ${CRON_SECRET || ''}` },
   }).catch(() => {});

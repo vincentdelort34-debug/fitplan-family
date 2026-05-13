@@ -73,7 +73,7 @@ export default async function handler(req, res) {
       if (conns.length) {
         const userId = conns[0].user_id;
         // Trigger a recent-window sync (last 7 days covers most updates)
-        fetch(`${SITE_URL}/api/sync-strava?user=${userId}&days=7`, {
+        fetch(`${SITE_URL}/api/sync?provider=strava&user=${userId}&days=7`, {
           method:  'POST',
           headers: { 'Authorization': `Bearer ${process.env.CRON_SECRET || ''}` },
         }).catch(e => console.error('[strava-webhook] sync trigger failed', e));
