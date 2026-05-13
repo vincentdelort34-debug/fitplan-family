@@ -342,7 +342,10 @@ const DISPATCH = {
 
 async function runSyncForConnection(conn, daysBack) {
   const fn = DISPATCH[conn.source];
-  if (!fn) throw new Error(`unknown_provider_${conn.source}`);
+  if (!fn) {
+    // Push-based providers (apple_health) or future providers we don't pull-sync — skip silently
+    return { user_id: conn.user_id, source: conn.source, skipped: 'no_pull_sync' };
+  }
   const t0 = Date.now();
   try {
     const r = await fn.sync(conn, daysBack);
