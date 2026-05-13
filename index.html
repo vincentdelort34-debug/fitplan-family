@@ -867,6 +867,7 @@ select option { background: var(--surface); color: var(--text); }
 // ===== STATE =====
 let sorties = [];
 let sante = [];
+let santeMulti = []; // health_data_unified pivoted to daily wide rows (multi-source aware)
 let poidsData = [];
 let glycoData = [];
 let repasVincent = [];
@@ -1103,15 +1104,47 @@ async function initSupabase() {
 async function loadAllData() {
   if (!sb || !currentUser) return;
   const uid = currentUser.id;
-  const [s1, p1, g1, r1, sa1] = await Promise.all([
+  const [s1, p1, g1, r1, sa1, hd1] = await Promise.all([
     sb.from('fitplan_sorties').select('*').eq('user_id', uid).order('date', { ascending: false }),
     sb.from('fitplan_poids').select('*').eq('user_id', uid).order('date', { ascending: false }),
     sb.from('fitplan_glyco').select('*').eq('user_id', uid).order('datetime', { ascending: false }),
     sb.from('fitplan_repas').select('*').eq('user_id', uid).order('date', { ascending: false }),
     sb.from('fitplan_sante').select('*').eq('user_id', uid).order('date', { ascending: true }).then(r => r, () => ({ data: [] })),
+    sb.from('health_data_unified').select('date,metric_type,source,value,unit').eq('user_id', uid).gte('date', new Date(Date.now() - 90*86400000).toISOString().slice(0,10)).order('date', { ascending: true }).then(r => r, () => ({ data: [] })),
   ]);
   sorties = s1.data || [];
   sante = (sa1 && sa1.data) || [];
+  // Pivot health_data_unified to daily wide rows for compat with rendering & prompts.
+  // Map unified metric_type → legacy field names used by existing code.
+  const UNIFIED_TO_LEGACY = {
+    sleep_duration:  ['sleep_sec', v => v * 60],
+    sleep_score:     ['sleep_score', v => v],
+    resting_hr:      ['rhr', v => v],
+    hrv:             ['hrv_last_night', v => v],
+    hrv_sdnn:        ['hrv_sdnn', v => v],
+    steps:           ['total_steps', v => v],
+    active_kcal:     ['active_kcal', v => v],
+    total_kcal:      ['total_kcal', v => v],
+    weight:          ['weight_kg', v => v],
+    body_fat:        ['body_fat', v => v],
+    vo2max:          ['vo2_run', v => v], // single bucket — display assumes either run or bike
+    training_load:   ['training_load_unified', v => v],
+    fatigue:         ['fatigue_unified', v => v],
+    spo2:            ['spO2', v => v],
+    respiration_rate:['respiration', v => v],
+    bp_systolic:     ['bp_systolic', v => v],
+    bp_diastolic:    ['bp_diastolic', v => v],
+  };
+  const byDate = {};
+  for (const row of (hd1.data || [])) {
+    if (!byDate[row.date]) byDate[row.date] = { date: row.date, _sources: {} };
+    const mapping = UNIFIED_TO_LEGACY[row.metric_type];
+    if (!mapping) continue;
+    const [field, tx] = mapping;
+    byDate[row.date][field] = tx(Number(row.value));
+    byDate[row.date]._sources[field] = row.source;
+  }
+  santeMulti = Object.values(byDate).sort((a,b) => a.date.localeCompare(b.date));
   poidsData = p1.data || [];
   glycoData = (g1.data || []).map(r => ({ date: r.datetime, val: r.val, ctx: r.ctx, note: r.note, id: r.id }));
   repasVincent = (r1.data || []).map(r => ({ date: r.date, type: r.type, description: r.label, kcal: r.kcal||0, proteines: r.proteines||0, glucides: r.glucides||0, lipides: r.lipides||0, conseil: '', score: null, photoThumb: null, id: r.id }));
@@ -1417,13 +1450,25 @@ function _destroyCharts() {
   _santeCharts = {};
 }
 function renderSante() {
-  if (!sante || !sante.length) {
-    document.getElementById('sante-stats').innerHTML = '<div class="text-muted" style="grid-column:1/-1;padding:20px;">Pas encore de données santé. La sync Garmin auto remplit cette section chaque matin.</div>';
+  // Combine legacy fitplan_sante + multi-source health_data_unified
+  const data = getSanteCombined();
+  if (!data.length) {
+    document.getElementById('sante-stats').innerHTML = '<div class="text-muted" style="grid-column:1/-1;padding:20px;">Pas encore de données santé. Configure tes connexions (onglet ⚙️ Connexions) — Strava, Intervals.icu, Apple Health ou Health Connect remplissent cet écran automatiquement.</div>';
     document.getElementById('sante-list').innerHTML = '';
     return;
   }
-  // Trier ASC par date
-  const data = [...sante].sort((a,b) => a.date.localeCompare(b.date));
+  // Show source legend at the top of the section
+  const srcCount = sourcesSummary(data);
+  const statsEl = document.getElementById('sante-stats');
+  if (statsEl && !document.getElementById('sources-legend')) {
+    const legend = document.createElement('div');
+    legend.id = 'sources-legend';
+    legend.style.cssText = 'grid-column:1/-1;font-size:11px;color:var(--muted);padding:4px 0 8px;';
+    legend.innerHTML = `📡 Sources actives : ${srcCount}`;
+    statsEl.parentNode.insertBefore(legend, statsEl);
+  } else if (document.getElementById('sources-legend')) {
+    document.getElementById('sources-legend').innerHTML = `📡 Sources actives : ${srcCount}`;
+  }
   // === STAT CARDS ===
   const last30 = data.slice(-30);
   const avg = (arr, key) => { const v = arr.map(d => d[key]).filter(x => x != null && !isNaN(x)); return v.length ? Math.round(v.reduce((a,b)=>a+b,0)/v.length*10)/10 : null; };
@@ -1519,11 +1564,13 @@ function renderSante() {
     options: { ...commonOpts, plugins: { legend: { display: false } } }
   });
 
-  // Liste détaillée
+  // Liste détaillée avec source pill par jour
   const recent = [...data].reverse().slice(0, 30);
+  const srcShort = s => ({ intervals_icu:'INT', strava:'STR', apple_health:'APL', google_health_connect:'AND', fitbit:'FIT', withings:'WTH', garmin_scrape:'GAR-S' }[s] || s);
   document.getElementById('sante-list').innerHTML = recent.map(d => {
     const sleepH = d.sleep_sec ? Math.floor(d.sleep_sec/3600) + 'h' + String(Math.round((d.sleep_sec%3600)/60)).padStart(2,'0') : '—';
-    return `<div style="display:grid;grid-template-columns:80px 1fr;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);font-size:12px;">
+    const srcs = d._sources ? Array.from(new Set(Object.values(d._sources))).map(srcShort).join('·') : '';
+    return `<div style="display:grid;grid-template-columns:80px 1fr auto;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);font-size:12px;">
       <div style="font-weight:700;color:var(--text);">${new Date(d.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}</div>
       <div style="color:var(--muted);">
         ${d.hrv_last_night?'<b style="color:#7F77DD;">HRV '+d.hrv_last_night+'ms</b>'+(d.hrv_status?' ('+d.hrv_status.toLowerCase()+')':'')+' · ':''}
@@ -1534,19 +1581,38 @@ function renderSante() {
         ${d.total_steps?d.total_steps.toLocaleString('fr-FR')+' pas':''}
         ${d.vo2_run||d.vo2_bike?' · <b>VO2 '+(d.vo2_run||d.vo2_bike)+'</b>':''}
       </div>
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;align-self:center;">${srcs}</div>
     </div>`;
   }).join('') || '<div class="text-muted" style="padding:20px;">Aucune donnée.</div>';
 }
 
 // ===== BILAN IA SANTÉ =====
+function getSanteCombined() {
+  // Merge legacy fitplan_sante data with multi-source health_data_unified.
+  // For each date, multi-source values take priority (more recent + cleaner).
+  const byDate = {};
+  for (const r of sante) byDate[r.date] = { ...r };
+  for (const r of santeMulti) byDate[r.date] = { ...(byDate[r.date] || {}), ...r };
+  return Object.values(byDate).sort((a,b) => a.date.localeCompare(b.date));
+}
+function sourcesSummary(rows) {
+  // Returns a short string like "intervals_icu (28d), strava (10d)" describing which sources contributed
+  const counts = {};
+  for (const r of rows) {
+    if (!r._sources) continue;
+    for (const src of Object.values(r._sources)) counts[src] = (counts[src] || 0) + 1;
+  }
+  return Object.entries(counts).map(([s,n]) => `${s.replace('_',' ')} (${n})`).join(', ') || 'fitplan_sante legacy';
+}
 function analyseSanteIA(mode) {
   const target = document.getElementById('sante-bilan-text');
   target.textContent = 'Analyse en cours…';
   target.className = 'ai-thinking';
   document.getElementById('sante-bilan-heure').textContent = new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
 
-  // Construire le contexte
-  const data = [...sante].sort((a,b) => a.date.localeCompare(b.date));
+  // Construire le contexte multi-sources
+  const data = getSanteCombined();
+  const srcSummary = sourcesSummary(data);
   const last14 = data.slice(-14);
   const prev14 = data.slice(-28, -14);
   const avg = (arr, key) => { const v = arr.map(d => d[key]).filter(x => x != null && !isNaN(x)); return v.length ? Math.round(v.reduce((a,b)=>a+b,0)/v.length*10)/10 : null; };
@@ -1580,6 +1646,7 @@ function analyseSanteIA(mode) {
   let prompt;
   if (mode === 'progres') {
     prompt = `Coach sportif & santé pour Vincent (51 ans, objectif perte de poids 93→83 kg, pratique vélo gravel + course).
+Sources data : ${srcSummary}.
 Données 14 derniers jours vs 14 jours précédents :
 - HRV nocturne : ${ctx.derniereSemaine.hrv}ms (vs ${ctx.semainePrecedente.hrv}ms)
 - FC repos : ${ctx.derniereSemaine.rhr}bpm (vs ${ctx.semainePrecedente.rhr}bpm)
@@ -1596,6 +1663,7 @@ Analyse les PROGRÈS spécifiques chiffrés en 4 sections courtes :
 Français direct, sans jargon excessif. Max 200 mots.`;
   } else if (mode === 'conseils') {
     prompt = `Coach sportif & santé pour Vincent (51 ans, FC max 169 bpm, sport vélo + course, perte de poids 93→83 kg).
+Sources data : ${srcSummary}.
 État actuel :
 - HRV nocturne moy 14j : ${ctx.derniereSemaine.hrv}ms (statut ${lastNonNull('hrv_status')||'?'})
 - FC repos : ${ctx.derniereSemaine.rhr}bpm
@@ -1856,6 +1924,19 @@ function genererBilanIA(moment) {
     ? sortiesAujourdhui.map(s => `${s.type} ${s.dist}km ${s.duree}min${s.fc?' FC'+s.fc:''}${s.ressenti?' ressenti:'+s.ressenti:''}`).join(', ')
     : 'Pas de sortie sportive aujourd\'hui';
 
+  // Wellness multi-sources du jour et veille (depuis health_data_unified)
+  const todayHD = santeMulti.find(d => d.date === todayStr) || {};
+  const yest = new Date(now); yest.setDate(yest.getDate() - 1);
+  const yestStr = yest.toISOString().split('T')[0];
+  const yestHD = santeMulti.find(d => d.date === yestStr) || {};
+  const fmtSleep = sec => sec ? Math.floor(sec/3600) + 'h' + String(Math.round((sec%3600)/60)).padStart(2,'0') : '—';
+  const contexteWellness = [
+    yestHD.sleep_sec ? `Sommeil nuit dernière : ${fmtSleep(yestHD.sleep_sec)}${yestHD.sleep_score ? ` (score ${yestHD.sleep_score}/100)` : ''}` : null,
+    todayHD.rhr || yestHD.rhr ? `FC repos : ${todayHD.rhr || yestHD.rhr} bpm` : null,
+    todayHD.hrv_last_night || yestHD.hrv_last_night ? `HRV : ${todayHD.hrv_last_night || yestHD.hrv_last_night} ms` : null,
+    yestHD.total_steps ? `Pas hier : ${yestHD.total_steps.toLocaleString('fr-FR')}` : null,
+  ].filter(Boolean).join(' · ') || 'Pas de données wellness';
+
   let contexteRepas = repasAujourdhui.length
     ? repasAujourdhui.map(r => `${r.type}: ${r.description||r.label||'?'} (~${r.kcal||0}kcal)`).join(' / ')
     : 'Aucun repas enregistré';
@@ -1869,6 +1950,7 @@ function genererBilanIA(moment) {
     matin: `Tu es coach sport-nutrition. Bilan matinal de ${profilCtx}.
 Données disponibles ce matin :
 - ${contextePoids}
+- Wellness : ${contexteWellness}
 - ${contexteRepas !== 'Aucun repas enregistré' ? 'Repas hier soir : ' + contexteRepas : 'Pas encore de repas enregistré aujourd\'hui'}
 - Sport : ${contexteSorties}
 
@@ -1881,6 +1963,7 @@ Ton direct, motivant, max 100 mots. Tutoiement.`,
     soir: `Tu es coach sport-nutrition. Bilan de fin de journée de ${profilCtx}.
 Bilan du jour :
 - ${contextePoids}
+- Wellness : ${contexteWellness}
 - Alimentation : ${contexteRepas} — Total : ${kcalTotal} kcal, ${protTotal}g protéines (objectif ${OBJECTIF_KCAL_USER} kcal)
 - Sport : ${contexteSorties}
 
