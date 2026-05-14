@@ -2,8 +2,18 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>FitPlan</title>
+
+<!-- PWA / Add to Home Screen (iOS + Android) -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="FitPlan">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1a5f7a">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="icon" href="/icon-192.png" sizes="192x192" type="image/png">
+<link rel="manifest" href="/manifest.json">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
@@ -398,6 +408,7 @@ select option { background: var(--surface); color: var(--text); }
     <div class="tab" onclick="showSection('sante',event)">❤️ Santé</div>
     <div class="tab" onclick="showSection('connexions',event)">⚙️ Connexions</div>
     <div class="tab tab-discrete" onclick="showSection('glycemie',event)">Glycémie</div>
+    <div class="tab tab-discrete" id="tab-admin" onclick="showSection('admin',event)" style="display:none;">🔬 Admin</div>
   </div>
 </header>
 
@@ -858,6 +869,35 @@ select option { background: var(--surface); color: var(--text); }
     <div class="text-muted" style="font-size:13px;">Polar Flow · Coros · Suunto · Whoop · Oura · Garmin Connect API officielle (en attente d'approbation Garmin Developer Program).</div>
   </div>
 
+  <!-- Astuce installation écran d'accueil -->
+  <div class="card" style="background:linear-gradient(135deg,rgba(212,168,83,0.1),rgba(212,168,83,0.04));border-left:3px solid var(--gold);">
+    <div class="card-title">📱 Installer FitPlan en app sur ton téléphone</div>
+    <div style="font-size:13px;line-height:1.7;">
+      <b>Sur iPhone (Safari)</b> : tape le bouton <b>Partager 􀈂</b> en bas → choisis <b>« Sur l'écran d'accueil »</b> → tape <b>Ajouter</b> en haut à droite. FitPlan apparaît comme une vraie app (icône cœur ❤️) sur ton écran. Plein écran, sans la barre Safari.<br><br>
+      <b>Sur Android (Chrome)</b> : tape le menu <b>⋮</b> en haut à droite → <b>« Ajouter à l'écran d'accueil »</b> ou <b>« Installer l'application »</b>.<br><br>
+      <span class="text-muted" style="font-size:11px;">Pas besoin de passer par l'App Store. C'est l'équivalent d'une vraie app native, en plus léger.</span>
+    </div>
+  </div>
+
+</div>
+
+<!-- ======= ADMIN (Vincent uniquement) ======= -->
+<div id="admin" class="section">
+  <div class="card" style="background:linear-gradient(135deg,rgba(127,119,221,0.1),rgba(83,74,183,0.04));">
+    <div class="card-title">🔬 Dashboard admin — beta testers</div>
+    <div class="text-muted" style="font-size:12px;">Visible uniquement pour toi. Suivi de l'engagement des users sur les 14 derniers jours.</div>
+  </div>
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+      <div class="card-title" style="margin-bottom:0;">Aperçu</div>
+      <button class="btn-outline" onclick="loadAdminStats()" style="font-size:11px;padding:4px 10px;margin-top:0;">↻ Rafraîchir</button>
+    </div>
+    <div id="admin-summary" class="text-muted" style="font-size:13px;">Chargement…</div>
+  </div>
+  <div class="card">
+    <div class="card-title">📊 Détail par user</div>
+    <div id="admin-userlist" class="text-muted" style="font-size:12px;">Chargement…</div>
+  </div>
 </div>
 
 
@@ -1231,6 +1271,7 @@ function showSection(id, e) {
   if (id === 'recettes') renderRecipes();
   if (id === 'repas') { initRepasPage('v'); }
   if (id === 'connexions') loadConnexions();
+  if (id === 'admin') loadAdminStats();
 }
 
 // ===== PLAN VINCENT =====
@@ -3271,15 +3312,77 @@ async function syncIntervalsNow() {
   setTimeout(loadConnexions, 2000);
 }
 
+// ===== ADMIN DASHBOARD (visible Vincent uniquement) =====
+const ADMIN_USER_ID = 'aab8ac2a-e4b7-40ab-88d9-e72b1f28758c';
+function maybeShowAdminTab() {
+  const tab = document.getElementById('tab-admin');
+  if (!tab) return;
+  tab.style.display = (currentUser && currentUser.id === ADMIN_USER_ID) ? '' : 'none';
+}
+async function loadAdminStats() {
+  if (!sb || !currentUser || currentUser.id !== ADMIN_USER_ID) return;
+  const summaryEl = document.getElementById('admin-summary');
+  const listEl = document.getElementById('admin-userlist');
+  if (summaryEl) summaryEl.innerHTML = 'Chargement…';
+  if (listEl)    listEl.innerHTML = 'Chargement…';
+  try {
+    const session = await sb.auth.getSession();
+    const token = session.data.session && session.data.session.access_token;
+    if (!token) { summaryEl.innerHTML = '<span style="color:var(--danger);">Session expirée.</span>'; return; }
+    const r = await fetch('/api/admin-stats', { headers: { 'Authorization': 'Bearer ' + token } });
+    const j = await r.json();
+    if (!j.ok) { summaryEl.innerHTML = '<span style="color:var(--danger);">' + (j.error || j.detail || 'Erreur') + '</span>'; return; }
+    const users = j.users || [];
+    const active7d = users.filter(u => u.nb_repas_7d + u.nb_poids_7d > 0).length;
+    const engagedUsers = users.filter(u => u.days_active_14d >= 7).length;
+    const totalRepas = users.reduce((a,u)=>a+u.nb_repas_total, 0);
+    const totalSorties = users.reduce((a,u)=>a+u.nb_sorties, 0);
+    summaryEl.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;">
+        <div style="background:var(--bg2);padding:10px;border-radius:8px;"><div style="font-size:11px;color:var(--muted);">Users total</div><div style="font-family:'DM Mono';font-size:1.3rem;color:var(--text);">${j.total_users}</div></div>
+        <div style="background:var(--bg2);padding:10px;border-radius:8px;"><div style="font-size:11px;color:var(--muted);">Actifs 7 derniers jours</div><div style="font-family:'DM Mono';font-size:1.3rem;color:var(--success,#1D9E75);">${active7d}</div></div>
+        <div style="background:var(--bg2);padding:10px;border-radius:8px;"><div style="font-size:11px;color:var(--muted);">Engagés (≥7j/14)</div><div style="font-family:'DM Mono';font-size:1.3rem;color:#7F77DD;">${engagedUsers}</div></div>
+        <div style="background:var(--bg2);padding:10px;border-radius:8px;"><div style="font-size:11px;color:var(--muted);">Total repas loggés</div><div style="font-family:'DM Mono';font-size:1.3rem;">${totalRepas}</div></div>
+        <div style="background:var(--bg2);padding:10px;border-radius:8px;"><div style="font-size:11px;color:var(--muted);">Total sorties</div><div style="font-family:'DM Mono';font-size:1.3rem;">${totalSorties}</div></div>
+      </div>`;
+    listEl.innerHTML = users.map(u => {
+      const lastSeen = u.hours_since_last_login == null ? 'jamais' :
+        u.hours_since_last_login < 1 ? '< 1h' :
+        u.hours_since_last_login < 24 ? u.hours_since_last_login + 'h' :
+        Math.floor(u.hours_since_last_login/24) + 'j';
+      const engagementBar = `<div style="background:var(--bg2);height:6px;border-radius:3px;overflow:hidden;margin:4px 0;"><div style="width:${u.engagement_pct}%;height:100%;background:linear-gradient(90deg,#1D9E75,#7F77DD);"></div></div>`;
+      const sources = (u.sources_actives||[]).join(' · ') || '—';
+      const isMe = u.user_id === ADMIN_USER_ID ? ' (toi)' : '';
+      return `
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
+            <div><b>${u.nom || u.email.split('@')[0]}</b>${isMe} <span style="color:var(--muted);font-size:11px;">· ${u.email}</span></div>
+            <div style="font-size:11px;color:var(--muted);">inscrit il y a ${u.days_since_signup}j</div>
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:4px;">Dernière session : <b style="color:var(--text);">${lastSeen}</b> · Sources : ${sources}</div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted);">
+            <span><b style="color:var(--text);">${u.days_active_14d}/14</b> jours actifs</span>
+            <span>${u.nb_repas_total} repas (${u.nb_repas_7d} sur 7j)</span>
+            <span>${u.nb_poids_total} pesées (${u.nb_poids_7d} sur 7j)</span>
+            <span>${u.nb_sorties} sorties</span>
+          </div>
+          ${engagementBar}
+        </div>`;
+    }).join('') || '<div class="text-muted">Aucun user.</div>';
+  } catch (e) {
+    if (summaryEl) summaryEl.innerHTML = '<span style="color:var(--danger);">' + e.message + '</span>';
+  }
+}
+
 // ===== INIT =====
 document.getElementById('s-date').value = today;
 document.getElementById('p-date').value = today;
 document.getElementById('g-datetime').value = today + 'T08:00';
 renderPlan();
 initSupabase();
-// After login, also load today's health
+// After login, also load today's health + maybe show admin tab
 const _origLoadAll = loadAllData;
-loadAllData = async function() { await _origLoadAll.apply(this, arguments); loadTodayHealth(); };
+loadAllData = async function() { await _origLoadAll.apply(this, arguments); loadTodayHealth(); maybeShowAdminTab(); };
 </script>
 </body>
 </html>
