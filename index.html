@@ -41,7 +41,7 @@
     <div class="ob-sub">Configure ton profil pour personnaliser l'app</div>
     <div class="ob-card">
       <div class="ob-grid">
-        <div class="ob-field ob-full"><label>Prénom</label><input id="ob-nom" type="text" placeholder="Vincent"></div>
+        <div class="ob-field ob-full"><label>Prénom</label><input id="ob-nom" type="text" placeholder="Ton prénom"></div>
         <div class="ob-field"><label>Âge</label><input id="ob-age" type="number" placeholder="51"></div>
         <div class="ob-field"><label>Taille (cm)</label><input id="ob-taille" type="number" placeholder="178"></div>
         <div class="ob-field"><label>Poids actuel (kg)</label><input id="ob-poids" type="number" placeholder="ex. 70" step="0.1"></div>
@@ -477,23 +477,23 @@ select option { background: var(--surface); color: var(--text); }
     </div>
     <div class="info-box sage" id="fc-zones-tip" style="margin-top:10px;">💡 Vise la <b>Z2</b> sur 60–70% de tes sorties pour brûler les graisses.</div>
   </div>
-  <div class="card">
-    <div class="card-title">🍳 Petit-déjeuner validé</div>
-    <span class="tag">Fromage blanc</span><span class="tag">Beurre de cacahuète</span><span class="tag">Collagène + citron</span><span class="tag">Café</span>
+  <div class="card" id="dash-petitdej-card">
+    <div class="card-title" id="dash-petitdej-title">🍳 Petit-déjeuner habituel</div>
+    <div id="dash-petitdej-tags"></div>
     <div class="divider"></div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center;">
-      <div><div style="font-family:'DM Mono';font-size:1.1rem;color:var(--blue);">~380</div><div style="font-size:11px;color:var(--muted);">kcal</div></div>
-      <div><div style="font-family:'DM Mono';font-size:1.1rem;color:var(--blue);">~35g</div><div style="font-size:11px;color:var(--muted);">protéines</div></div>
-      <div><div style="font-family:'DM Mono';font-size:1.1rem;color:var(--blue);">~12g</div><div style="font-size:11px;color:var(--muted);">lipides</div></div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center;" id="dash-petitdej-macros">
+      <div><div style="font-family:'DM Mono';font-size:1.1rem;color:var(--blue);" id="dash-pd-kcal">—</div><div style="font-size:11px;color:var(--muted);">kcal</div></div>
+      <div><div style="font-family:'DM Mono';font-size:1.1rem;color:var(--blue);" id="dash-pd-prot">—</div><div style="font-size:11px;color:var(--muted);">protéines</div></div>
+      <div><div style="font-family:'DM Mono';font-size:1.1rem;color:var(--blue);" id="dash-pd-lip">—</div><div style="font-size:11px;color:var(--muted);">lipides</div></div>
     </div>
-    <div class="info-box sage" style="margin-top:10px;">✅ Excellent : riche en protéines, satiété longue, pas de pic glycémique.</div>
+    <div class="info-box sage" id="dash-petitdej-tip" style="margin-top:10px;">Configure ton petit-déjeuner dans l'onglet 🍽️ Repas pour le valider en 1 tap chaque matin.</div>
   </div>
 </div>
 
 <div id="plan" class="section">
   <div class="card">
-    <div class="card-title">📅 Plan hebdomadaire — Vincent</div>
-    <div class="text-muted" style="margin-bottom:12px;">2–3 séances/semaine · Rythme vigneron · Priorité Z2 perte de poids</div>
+    <div class="card-title" id="plan-title">📅 Plan hebdomadaire</div>
+    <div class="text-muted" id="plan-subtitle" style="margin-bottom:12px;">2–3 séances/semaine · Priorité Z2 perte de poids</div>
     <div id="week-grid"></div>
   </div>
   <div class="card" id="day-detail" style="display:none;">
@@ -556,8 +556,8 @@ select option { background: var(--surface); color: var(--text); }
     <div class="card-title">🌅 Petit-déjeuner habituel</div>
     <div style="display:flex;align-items:center;gap:12px;padding:10px 0;">
       <div style="flex:1;">
-        <div style="font-size:14px;font-weight:600;" id="petitdej-label-v">Fromage blanc · Beurre de cacahuète · Collagène citron · Café</div>
-        <div style="font-size:12px;color:var(--muted);margin-top:3px;">~380 kcal · ~35g protéines</div>
+        <div style="font-size:14px;font-weight:600;" id="petitdej-label-v">Configure ton petit-déjeuner habituel</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:3px;" id="petitdej-macros-v">Tape sur "Modifier →" pour le définir une fois</div>
       </div>
       <button id="petitdej-btn-v" class="btn" style="margin-top:0;padding:10px 16px;white-space:nowrap;" onclick="validerPetitDej('v')">✓ Validé</button>
     </div>
@@ -716,7 +716,7 @@ select option { background: var(--surface); color: var(--text); }
     <div style="font-size:14px;line-height:2.1;">
       Dans les <b>30–45 min</b> après ta sortie :<br>
       → <b>Option 1</b> : Yaourt grec 0% + banane + poignée de noix<br>
-      → <b>Option 2</b> : Fromage blanc + beurre de cacahuète (comme le matin — ça marche !)<br>
+      → <b>Option 2</b> : Fromage blanc + beurre de cacahuète + un fruit<br>
       → <b>Option 3</b> : 2 oeufs durs + tranche de pain complet + tomate<br>
       <span class="text-muted">But : recharger le glycogène et stopper le catabolisme musculaire</span>
     </div>
@@ -2503,7 +2503,7 @@ function refreshRecettes() {
 
   const contexteJour = ctx.isWeekend
     ? `Nous sommes ${ctx.jourNom} — weekend : repas plus élaborés possibles, plus de temps en cuisine. ${ctx.isWeekend && (ctx.sortieAujourdhui||ctx.sortieJourSuivant) ? 'Grosse sortie sportive au programme.' : ''}`
-    : `Nous sommes ${ctx.jourNom} — jour de semaine pour un vigneron actif : repas pratiques, rapides à préparer (max 30 min), nourrissants.`;
+    : `Nous sommes ${ctx.jourNom} — jour de semaine : repas pratiques, rapides à préparer (max 30 min), nourrissants.`;
 
   const prompt = `Tu es nutritionniste spécialisé perte de poids. Profil : ${getProfilContext()}.
 Contexte du jour : ${contexteJour}
@@ -2635,9 +2635,18 @@ function genererRecettesFrigo() {
 let repasPhotoBase64 = { v: null, e: null };
 let repasTypeEnCours = { v: 'dejeuner', e: 'dejeuner' };
 
-// Petit-déj habituel configurable
-const PETITDEJ_DEFAULT_V = { label: 'Fromage blanc · Beurre de cacahuète · Collagène citron · Café', kcal: 380, proteines: 35, glucides: 18, lipides: 12 };
-let petitDejConfig = JSON.parse(localStorage.getItem('petitDejConfig') || JSON.stringify({ v: PETITDEJ_DEFAULT_V, e: { label: 'Mon petit-déjeuner habituel', kcal: 0, proteines: 0, glucides: 0, lipides: 0 } }));
+// Petit-déj habituel configurable — KEY PAR USER pour ne pas partager entre comptes du même browser
+const PETITDEJ_EMPTY = { label: 'Configure ton petit-déjeuner habituel', kcal: 0, proteines: 0, glucides: 0, lipides: 0 };
+function petitDejKey() { return 'petitDejConfig_' + (currentUser?.id || 'anon'); }
+function loadPetitDej() {
+  try {
+    const raw = localStorage.getItem(petitDejKey());
+    if (raw) return JSON.parse(raw);
+  } catch(e){}
+  return { v: { ...PETITDEJ_EMPTY }, e: { ...PETITDEJ_EMPTY } };
+}
+function savePetitDej() { try { localStorage.setItem(petitDejKey(), JSON.stringify(petitDejConfig)); } catch(e){} }
+let petitDejConfig = { v: { ...PETITDEJ_EMPTY }, e: { ...PETITDEJ_EMPTY } };
 
 const SLOT_ICONS = { 'petit-dej': '🌅', 'dejeuner': '☀️', 'collation': '🍎', 'diner': '🌙' };
 const SLOT_NAMES = { 'petit-dej': 'Petit-déjeuner', 'dejeuner': 'Déjeuner', 'collation': 'Collation', 'diner': 'Dîner' };
@@ -2673,12 +2682,15 @@ function initRepasPage(who) {
   const inp = document.getElementById('repas-date-input-' + who);
   if (inp) inp.value = selDate;
 
-  // Config petit-déj
+  // Config petit-déj (par user)
   const cfg = petitDejConfig[who];
   const lbl = document.getElementById('petitdej-label-' + who);
-  const kcalLbl = document.getElementById('petitdej-kcal-' + who);
+  const macrosLbl = document.getElementById('petitdej-macros-' + who);
   if (lbl) lbl.textContent = cfg.label;
-  if (kcalLbl) kcalLbl.textContent = cfg.kcal > 0 ? `~${cfg.kcal} kcal · ~${cfg.proteines}g protéines` : 'Pas encore configuré';
+  if (macrosLbl) macrosLbl.textContent = cfg.kcal > 0 ? `~${cfg.kcal} kcal · ~${cfg.proteines}g protéines` : 'Tape sur "Modifier →" pour le définir une fois';
+  // Cacher le bouton "Validé" si pas encore configuré
+  const btnInit = document.getElementById('petitdej-btn-' + who);
+  if (btnInit) btnInit.style.display = cfg.kcal > 0 ? '' : 'none';
 
   // Vérifier si déjà validé aujourd'hui
   const today = getRepasAujourdhui(who);
@@ -2941,10 +2953,40 @@ saveModal = function() {
       lipides: parseInt(document.getElementById('pdj-lip').value) || 0,
     };
     petitDejConfig[who] = cfg;
+    savePetitDej();
     closeModal();
     initRepasPage(who);
+    refreshDashPetitDej();
   } else { _saveModalOrig(); }
 };
+
+// Mettre à jour la card dashboard "Petit-déjeuner habituel"
+function refreshDashPetitDej() {
+  const cfg = petitDejConfig?.v;
+  const card = document.getElementById('dash-petitdej-card');
+  if (!card) return;
+  const tagsEl = document.getElementById('dash-petitdej-tags');
+  const kcalEl = document.getElementById('dash-pd-kcal');
+  const protEl = document.getElementById('dash-pd-prot');
+  const lipEl  = document.getElementById('dash-pd-lip');
+  const tipEl  = document.getElementById('dash-petitdej-tip');
+  if (!cfg || !cfg.kcal) {
+    if (tagsEl) tagsEl.innerHTML = '<span class="text-muted" style="font-size:13px;">Pas encore configuré.</span>';
+    if (kcalEl) kcalEl.textContent = '—';
+    if (protEl) protEl.textContent = '—';
+    if (lipEl) lipEl.textContent = '—';
+    if (tipEl) tipEl.innerHTML = 'Configure ton petit-déjeuner dans l\'onglet 🍽️ Repas pour le valider en 1 tap chaque matin.';
+    return;
+  }
+  if (tagsEl) {
+    const parts = String(cfg.label||'').split(/[·,]/).map(s => s.trim()).filter(Boolean);
+    tagsEl.innerHTML = parts.length ? parts.map(p => `<span class="tag">${p}</span>`).join('') : `<span class="tag">${cfg.label}</span>`;
+  }
+  if (kcalEl) kcalEl.textContent = '~' + cfg.kcal;
+  if (protEl) protEl.textContent = '~' + cfg.proteines + 'g';
+  if (lipEl)  lipEl.textContent  = '~' + cfg.lipides + 'g';
+  if (tipEl) tipEl.innerHTML = '✅ Habitude validée. Tu peux la modifier dans l\'onglet 🍽️ Repas.';
+}
 
 // ===== PRÉCHARGEMENT DONNÉES LIBREVIEW (rapport 9–22 mars 2026) =====
 function preloadLibreView() {
@@ -3431,6 +3473,9 @@ const _origLoadAll = loadAllData;
 loadAllData = async function() {
   await _origLoadAll.apply(this, arguments);
   refreshDashboardFromProfile();
+  // Charger le petit-déj habituel du user courant (clé localStorage par user_id)
+  petitDejConfig = loadPetitDej();
+  refreshDashPetitDej();
   loadTodayHealth();
   maybeShowAdminTab();
 };
