@@ -44,8 +44,8 @@
         <div class="ob-field ob-full"><label>Prénom</label><input id="ob-nom" type="text" placeholder="Vincent"></div>
         <div class="ob-field"><label>Âge</label><input id="ob-age" type="number" placeholder="51"></div>
         <div class="ob-field"><label>Taille (cm)</label><input id="ob-taille" type="number" placeholder="178"></div>
-        <div class="ob-field"><label>Poids actuel (kg)</label><input id="ob-poids" type="number" placeholder="93" step="0.1"></div>
-        <div class="ob-field"><label>Objectif (kg)</label><input id="ob-objectif" type="number" placeholder="83" step="0.1"></div>
+        <div class="ob-field"><label>Poids actuel (kg)</label><input id="ob-poids" type="number" placeholder="ex. 70" step="0.1"></div>
+        <div class="ob-field"><label>Objectif (kg)</label><input id="ob-objectif" type="number" placeholder="ex. 65" step="0.1"></div>
         <div class="ob-field"><label>Sexe</label><select id="ob-sexe"><option value="h">Homme</option><option value="f">Femme</option></select></div>
         <div class="ob-field ob-full"><label>Sport principal</label><select id="ob-sport"><option value="velo">Vélo / Gravel</option><option value="course">Course à pied</option><option value="mixte">Mixte (vélo + course)</option><option value="marche">Marche / Randonnée</option><option value="autre">Autre</option></select></div>
         <div class="ob-field ob-full"><label>Objectif calorique/jour (kcal)</label><input id="ob-kcal" type="number" placeholder="1800"></div>
@@ -453,27 +453,29 @@ select option { background: var(--surface); color: var(--text); }
   </div>
 
   <div class="stats-grid">
-    <div class="stat-box"><div class="stat-val" id="dash-poids">93</div><div class="stat-unit">kg</div><div class="stat-label">Poids actuel</div></div>
+    <div class="stat-box"><div class="stat-val" id="dash-poids">—</div><div class="stat-unit">kg</div><div class="stat-label">Poids actuel</div></div>
     <div class="stat-box"><div class="stat-val" id="dash-perdu">—</div><div class="stat-unit">kg perdus</div><div class="stat-label">Depuis début</div></div>
     <div class="stat-box"><div class="stat-val" id="dash-sorties">0</div><div class="stat-unit">sorties</div><div class="stat-label">Ce mois</div></div>
     <div class="stat-box"><div class="stat-val" id="dash-km">0</div><div class="stat-unit">km</div><div class="stat-label">Total</div></div>
   </div>
-  <div class="card">
-    <div class="card-title">🎯 Objectif — 93 kg → 83 kg</div>
+  <div class="card" id="card-objectif">
+    <div class="card-title" id="obj-title">🎯 Objectif</div>
     <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);">
-      <span>93 kg</span><span style="color:var(--blue);font-weight:700;" id="obj-current">93 kg</span><span>83 kg</span>
+      <span id="obj-depart">—</span><span style="color:var(--blue);font-weight:700;" id="obj-current">—</span><span id="obj-cible">—</span>
     </div>
     <div class="obj-bar-wrap"><div class="obj-bar" id="obj-bar" style="width:0%"></div></div>
     <div class="text-muted" style="margin-top:6px;">Rythme : <b style="color:var(--text);">0,5–0,8 kg/semaine</b> · Durée estimée : 3–4 mois</div>
   </div>
   <div class="card">
-    <div class="card-title">❤️ Zones FC — 51 ans · FC max 169 bpm</div>
-    <div class="zone-row"><div class="zone-name">Z1 Récup</div><div class="zone-bar-wrap"><div class="zone-bar" style="width:100%;background:#6b8f71;"></div></div><div class="zone-range">&lt; 101 bpm</div></div>
-    <div class="zone-row"><div class="zone-name">Z2 Graisses</div><div class="zone-bar-wrap"><div class="zone-bar" style="width:85%;background:#8ab58f;"></div></div><div class="zone-range">101–118</div></div>
-    <div class="zone-row"><div class="zone-name">Z3 Tempo</div><div class="zone-bar-wrap"><div class="zone-bar" style="width:68%;background:#d4a853;"></div></div><div class="zone-range">118–135</div></div>
-    <div class="zone-row"><div class="zone-name">Z4 Seuil</div><div class="zone-bar-wrap"><div class="zone-bar" style="width:50%;background:#c1623f;"></div></div><div class="zone-range">135–152</div></div>
-    <div class="zone-row"><div class="zone-name">Z5 VO2max</div><div class="zone-bar-wrap"><div class="zone-bar" style="width:30%;background:#b03030;"></div></div><div class="zone-range">152–169</div></div>
-    <div class="info-box sage" style="margin-top:10px;">💡 Vise <b>Z2 (101–118 bpm)</b> sur 60–70% de tes sorties pour brûler les graisses.</div>
+    <div class="card-title" id="fc-zones-title">❤️ Zones FC</div>
+    <div id="fc-zones-body">
+      <div class="zone-row"><div class="zone-name">Z1 Récup</div><div class="zone-bar-wrap"><div class="zone-bar" style="width:100%;background:#6b8f71;"></div></div><div class="zone-range">—</div></div>
+      <div class="zone-row"><div class="zone-name">Z2 Graisses</div><div class="zone-bar-wrap"><div class="zone-bar" style="width:85%;background:#8ab58f;"></div></div><div class="zone-range">—</div></div>
+      <div class="zone-row"><div class="zone-name">Z3 Tempo</div><div class="zone-bar-wrap"><div class="zone-bar" style="width:68%;background:#d4a853;"></div></div><div class="zone-range">—</div></div>
+      <div class="zone-row"><div class="zone-name">Z4 Seuil</div><div class="zone-bar-wrap"><div class="zone-bar" style="width:50%;background:#c1623f;"></div></div><div class="zone-range">—</div></div>
+      <div class="zone-row"><div class="zone-name">Z5 VO2max</div><div class="zone-bar-wrap"><div class="zone-bar" style="width:30%;background:#b03030;"></div></div><div class="zone-range">—</div></div>
+    </div>
+    <div class="info-box sage" id="fc-zones-tip" style="margin-top:10px;">💡 Vise la <b>Z2</b> sur 60–70% de tes sorties pour brûler les graisses.</div>
   </div>
   <div class="card">
     <div class="card-title">🍳 Petit-déjeuner validé</div>
@@ -726,7 +728,7 @@ select option { background: var(--surface); color: var(--text); }
     <div class="card-title">⚖️ Enregistrer le poids</div>
     <div class="poids-row">
       <div class="form-group" style="flex:1;"><label>Date</label><input type="date" id="p-date"></div>
-      <div class="form-group" style="flex:1;"><label>Poids (kg)</label><input type="number" id="p-val" placeholder="93.0" step="0.1"></div>
+      <div class="form-group" style="flex:1;"><label>Poids (kg)</label><input type="number" id="p-val" placeholder="ex. 70.0" step="0.1"></div>
       <button class="btn" style="margin-top:22px;" onclick="ajouterPoids()">+ Ajouter</button>
     </div>
   </div>
@@ -1034,8 +1036,8 @@ async function loadUserProfile() {
   const { data, error } = await sb.from('fitplan_profils').select('*').eq('id', currentUser.id).single();
   if (data && !error) {
     userProfile = data;
-    POIDS_DEPART = userProfile.poids_depart || 93;
-    POIDS_OBJECTIF = userProfile.poids_objectif || 83;
+    POIDS_DEPART = parseFloat(userProfile.poids_depart) || 0;
+    POIDS_OBJECTIF = parseFloat(userProfile.poids_objectif) || 0;
     OBJECTIF_KCAL_USER = userProfile.objectif_kcal || 1800;
     showApp();
   } else {
@@ -1506,14 +1508,14 @@ function analyserSortie() {
   const dplus = parseInt(document.getElementById('s-dplus').value) || 0;
   const ressenti = document.getElementById('s-ressenti').value;
   if (!date || !dist || !duree) { alert('Merci de remplir date, distance et durée.'); return; }
-  const poidsActuel = userProfile ? (userProfile.poids_actuel || userProfile.poids_depart) : 93;
+  const poidsActuel = userProfile ? (userProfile.poids_actuel || userProfile.poids_depart || 70) : 70;
   sorties.push({ date, type, dist, duree, fc: fc || null, dplus, ressenti });
   if (sb && currentUser) sb.from('fitplan_sorties').insert({ user_id: currentUser.id, date, type, dist, duree, fc: fc||null, dplus, ressenti }).then(() => {});
   document.getElementById('ai-card').style.display = 'block';
   document.getElementById('ai-text').textContent = 'Analyse en cours…';
   document.getElementById('ai-text').className = 'ai-thinking';
   document.getElementById('ai-card').scrollIntoView({ behavior: 'smooth' });
-  const fcMax = userProfile?.fc_max || 169;
+  const fcMax = userProfile?.fc_max || (userProfile?.age ? 220 - userProfile.age : 180);
   const fcZone = fc ? (fc<fcMax*0.6?'Z1':fc<fcMax*0.7?'Z2 endurance (brûle-graisses)':fc<fcMax*0.8?'Z3 tempo':fc<fcMax*0.9?'Z4 seuil':'Z5 VO2max') : 'inconnue';
   const allure = type==='course'&&dist&&duree ? (duree/dist).toFixed(1)+' min/km' : dist&&duree ? (dist/duree*60).toFixed(1)+' km/h' : '—';
   const kcal = type==='course' ? Math.round(dist*poidsActuel*0.9) : Math.round(dist*poidsActuel*0.5);
@@ -1608,7 +1610,7 @@ async function analyzeWorkout(wkKey, btn) {
     avgRecent('rhr') ? `FC repos moy ${avgRecent('rhr')}bpm` : null,
   ].filter(Boolean).join(', ') || 'pas de contexte wellness';
 
-  const profil = (typeof getProfilContext === 'function' ? getProfilContext() : 'utilisateur 51 ans, FC max 169 bpm');
+  const profil = (typeof getProfilContext === 'function' ? getProfilContext() : 'utilisateur');
   const zones = _getZoneSummary(s);
 
   const lines = [];
@@ -1926,7 +1928,7 @@ function analyseSanteIA(mode) {
   const lastNonNull = (key) => { for (let i = data.length-1; i >= 0; i--) if (data[i][key] != null) return data[i][key]; return null; };
 
   const ctx = {
-    profil: getProfilContext ? getProfilContext() : 'Vincent, 51 ans',
+    profil: getProfilContext ? getProfilContext() : 'utilisateur',
     periode: `${data[0]?.date} → ${data[data.length-1]?.date}`,
     nbJours: data.length,
     nbSorties: sorties.length,
@@ -1951,8 +1953,10 @@ function analyseSanteIA(mode) {
   };
 
   let prompt;
+  const profilStr = (typeof getProfilContext === 'function' ? getProfilContext() : 'utilisateur');
+  const fcMaxUser = userProfile?.fc_max || (userProfile?.age ? 220 - userProfile.age : 180);
   if (mode === 'progres') {
-    prompt = `Coach sportif & santé pour Vincent (51 ans, objectif perte de poids 93→83 kg, pratique vélo gravel + course).
+    prompt = `Coach sportif & santé pour ${profilStr}, FC max ${fcMaxUser} bpm.
 Sources data : ${srcSummary}.
 Données 14 derniers jours vs 14 jours précédents :
 - HRV nocturne : ${ctx.derniereSemaine.hrv}ms (vs ${ctx.semainePrecedente.hrv}ms)
@@ -1969,7 +1973,7 @@ Analyse les PROGRÈS spécifiques chiffrés en 4 sections courtes :
 4. 💡 Une action concrète à mettre en place dès demain
 Français direct, sans jargon excessif. Max 200 mots.`;
   } else if (mode === 'conseils') {
-    prompt = `Coach sportif & santé pour Vincent (51 ans, FC max 169 bpm, sport vélo + course, perte de poids 93→83 kg).
+    prompt = `Coach sportif & santé pour ${profilStr}, FC max ${fcMaxUser} bpm.
 Sources data : ${srcSummary}.
 État actuel :
 - HRV nocturne moy 14j : ${ctx.derniereSemaine.hrv}ms (statut ${lastNonNull('hrv_status')||'?'})
@@ -1984,7 +1988,7 @@ Donne 5 conseils PRIORISÉS (du plus important au moins important) pour optimise
 Chaque conseil : titre court + 1 phrase d'explication + action concrète.
 Français direct, motivant. Max 250 mots.`;
   } else {
-    prompt = `Coach santé & forme pour Vincent (51 ans, 178cm, objectif perte de poids 93→83 kg, sport vélo gravel + course à pied, FC max 169 bpm).
+    prompt = `Coach santé & forme pour ${profilStr}, taille ${userProfile?.taille||'?'}cm, FC max ${fcMaxUser} bpm.
 Données des 14 derniers jours (sur ${ctx.nbJours} jours total) :
 - HRV nocturne moy : ${ctx.derniereSemaine.hrv}ms (semaine précédente ${ctx.semainePrecedente.hrv}ms) — statut HRV ${lastNonNull('hrv_status')||'?'}
 - FC repos moy : ${ctx.derniereSemaine.rhr}bpm (semaine précédente ${ctx.semainePrecedente.rhr}bpm)
@@ -2221,7 +2225,7 @@ function genererBilanIA(moment) {
 
   // Données du jour
   const poidsAujourdhui = poidsData.filter(p => p.date === todayStr);
-  const poidsActuel = poidsData.length ? poidsData[poidsData.length-1].val : 93;
+  const poidsActuel = poidsData.length ? poidsData[poidsData.length-1].val : (userProfile?.poids_actuel || userProfile?.poids_depart || '?');
   const sortiesAujourdhui = sorties.filter(s => s.date === todayStr);
   const repasAujourdhui = repasVincent.filter(r => r.date === todayStr);
   const kcalTotal = repasAujourdhui.reduce((a,r) => a+(r.kcal||0), 0);
@@ -2313,11 +2317,11 @@ function updateDashboard() {
     const range = POIDS_DEPART - POIDS_OBJECTIF || 10;
     document.getElementById('obj-bar').style.width = Math.min(100,Math.max(0,(perdu/range)*100)) + '%';
   }
-  // Mettre à jour le titre objectif avec les valeurs du profil
-  const objCard = document.querySelector('#dashboard .card-title');
-  if (objCard && objCard.textContent.includes('Objectif')) {
-    objCard.textContent = `🎯 Objectif — ${POIDS_DEPART} kg → ${POIDS_OBJECTIF} kg`;
-  }
+  // Mettre à jour le titre objectif + les bornes (depart/cible) avec les valeurs du profil
+  const titleEl = document.getElementById('obj-title');
+  if (titleEl) titleEl.textContent = `🎯 Objectif — ${POIDS_DEPART} kg → ${POIDS_OBJECTIF} kg`;
+  const depEl = document.getElementById('obj-depart'); if (depEl) depEl.textContent = POIDS_DEPART + ' kg';
+  const cibleEl = document.getElementById('obj-cible'); if (cibleEl) cibleEl.textContent = POIDS_OBJECTIF + ' kg';
 }
 
 // ===== MODAL ÉDITION =====
@@ -3380,9 +3384,56 @@ document.getElementById('p-date').value = today;
 document.getElementById('g-datetime').value = today + 'T08:00';
 renderPlan();
 initSupabase();
-// After login, also load today's health + maybe show admin tab
+// After login, also load today's health + maybe show admin tab + refresh dashboard from profile
+function refreshDashboardFromProfile() {
+  if (!userProfile) return;
+  const dep = parseFloat(userProfile.poids_depart) || 0;
+  const obj = parseFloat(userProfile.poids_objectif) || 0;
+  const cur = parseFloat(userProfile.poids_actuel) || dep;
+  // Dashboard stats : si pas encore de pesée loggée, on affiche au moins le poids actuel du profil
+  if (!Array.isArray(poidsData) || !poidsData.length) {
+    const el = document.getElementById('dash-poids'); if (el) el.textContent = cur || '—';
+  }
+  // Bloc Objectif
+  const titleEl = document.getElementById('obj-title');
+  if (titleEl) titleEl.textContent = (dep && obj) ? `🎯 Objectif — ${dep} kg → ${obj} kg` : '🎯 Objectif';
+  const depEl = document.getElementById('obj-depart'); if (depEl) depEl.textContent = dep ? dep + ' kg' : '—';
+  const cibleEl = document.getElementById('obj-cible'); if (cibleEl) cibleEl.textContent = obj ? obj + ' kg' : '—';
+  const curEl = document.getElementById('obj-current'); if (curEl && (!poidsData || !poidsData.length)) curEl.textContent = cur ? cur + ' kg' : '—';
+  // Barre de progression : (poids_depart - actuel) / (poids_depart - objectif)
+  if (dep && obj && cur) {
+    const range = dep - obj || 1;
+    const progress = Math.min(100, Math.max(0, ((dep - cur) / range) * 100));
+    const barEl = document.getElementById('obj-bar'); if (barEl) barEl.style.width = progress + '%';
+  }
+  // Zones FC dynamiques (formule Karvonen simplifiée : % de FCmax)
+  const age = userProfile.age || null;
+  const fcMax = userProfile.fc_max || (age ? 220 - age : null);
+  const titleFC = document.getElementById('fc-zones-title');
+  if (titleFC) titleFC.textContent = (age && fcMax) ? `❤️ Zones FC — ${age} ans · FC max ${fcMax} bpm` : '❤️ Zones FC';
+  const body = document.getElementById('fc-zones-body');
+  if (body && fcMax) {
+    const z1 = Math.round(fcMax * 0.60);
+    const z2 = Math.round(fcMax * 0.70);
+    const z3 = Math.round(fcMax * 0.80);
+    const z4 = Math.round(fcMax * 0.90);
+    body.innerHTML = `
+      <div class="zone-row"><div class="zone-name">Z1 Récup</div><div class="zone-bar-wrap"><div class="zone-bar" style="width:100%;background:#6b8f71;"></div></div><div class="zone-range">&lt; ${z1} bpm</div></div>
+      <div class="zone-row"><div class="zone-name">Z2 Graisses</div><div class="zone-bar-wrap"><div class="zone-bar" style="width:85%;background:#8ab58f;"></div></div><div class="zone-range">${z1}–${z2}</div></div>
+      <div class="zone-row"><div class="zone-name">Z3 Tempo</div><div class="zone-bar-wrap"><div class="zone-bar" style="width:68%;background:#d4a853;"></div></div><div class="zone-range">${z2}–${z3}</div></div>
+      <div class="zone-row"><div class="zone-name">Z4 Seuil</div><div class="zone-bar-wrap"><div class="zone-bar" style="width:50%;background:#c1623f;"></div></div><div class="zone-range">${z3}–${z4}</div></div>
+      <div class="zone-row"><div class="zone-name">Z5 VO2max</div><div class="zone-bar-wrap"><div class="zone-bar" style="width:30%;background:#b03030;"></div></div><div class="zone-range">${z4}–${fcMax}</div></div>`;
+    const tip = document.getElementById('fc-zones-tip');
+    if (tip) tip.innerHTML = `💡 Vise <b>Z2 (${z1}–${z2} bpm)</b> sur 60–70% de tes sorties pour brûler les graisses.`;
+  }
+}
 const _origLoadAll = loadAllData;
-loadAllData = async function() { await _origLoadAll.apply(this, arguments); loadTodayHealth(); maybeShowAdminTab(); };
+loadAllData = async function() {
+  await _origLoadAll.apply(this, arguments);
+  refreshDashboardFromProfile();
+  loadTodayHealth();
+  maybeShowAdminTab();
+};
 </script>
 </body>
 </html>
