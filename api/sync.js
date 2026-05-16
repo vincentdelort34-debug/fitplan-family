@@ -27,11 +27,27 @@ async function supa(path, init = {}) {
   return r.status === 204 ? null : r.json();
 }
 
+// Normalize every row in a batch to the same key set so PostgREST accepts the
+// batch upsert. Without this, mixing wellness rows (no `metadata`) and activity
+// rows (with `metadata`) in the same payload triggers PGRST102
+// "All object keys must match".
+function normalizeRows(rows) {
+  const allKeys = new Set();
+  for (const r of rows) for (const k of Object.keys(r)) allKeys.add(k);
+  const keys = Array.from(allKeys);
+  return rows.map(r => {
+    const out = {};
+    for (const k of keys) out[k] = (k in r) ? r[k] : null;
+    return out;
+  });
+}
+
 async function upsertHealth(rows) {
   if (!rows.length) return 0;
+  const normalized = normalizeRows(rows);
   let inserted = 0;
-  for (let i = 0; i < rows.length; i += 200) {
-    const chunk = rows.slice(i, i + 200);
+  for (let i = 0; i < normalized.length; i += 200) {
+    const chunk = normalized.slice(i, i + 200);
     const out = await supa(
       `/rest/v1/health_data?on_conflict=user_id,source,external_id,metric_type`,
       { method: 'POST', body: JSON.stringify(chunk),
@@ -97,7 +113,15 @@ async function syncIntervals(conn, daysBack) {
       value: a.moving_time != null ? Math.round(a.moving_time/60) : null, unit: 'min',
       metadata: { id: a.id, name: a.name, type: a.type, distance_m: a.distance,
         moving_time_s: a.moving_time, elapsed_time_s: a.elapsed_time, elevation_gain: a.total_elevation_gain,
-        avg_hr: a.average_heartrate, max_hr: a.max_heartrate, training_load: a.training_load, tss: a.tss },
+        avg_hr: a.average_heartrate, max_hr: a.max_heartrate,
+        training_load: a.icu_training_load ?? a.training_load, tss: a.icu_training_load ?? a.tss,
+        calories: a.calories, kilojoules: a.kilojoules,
+        avg_watts: a.icu_average_watts ?? a.average_watts,
+        max_watts: a.max_watts,
+        weighted_avg_watts: a.icu_weighted_avg_watts ?? a.weighted_average_watts,
+        ftp: a.icu_ftp,
+        te_aero: a.icu_aerobic_training_effect, te_anaero: a.icu_anaerobic_training_effect,
+        avg_speed: a.average_speed, max_speed: a.max_speed },
       external_id: `intervals_act_${a.id}` });
   }
   const inserted = await upsertHealth(rows);

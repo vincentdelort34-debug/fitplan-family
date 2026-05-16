@@ -212,6 +212,11 @@ header { background: var(--navy); padding: 18px 20px 0; position: relative; over
 .badge-run { background: var(--terra-pale); color: var(--terra); }
 .badge-velo { background: var(--blue-pale); color: var(--blue); }
 .badge-repos { background: var(--bg2); color: var(--muted); }
+.badge-danse { background: #fce4ec; color: #ad1457; }
+.badge-yoga { background: #ede7f6; color: #4527a0; }
+.badge-muscu { background: #fff3e0; color: #e65100; }
+.badge-swim { background: #e1f5fe; color: #01579b; }
+.badge-marche { background: #f1f8e9; color: #33691e; }
 
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
 @media(max-width:460px){ .form-grid { grid-template-columns: 1fr; } }
@@ -1198,10 +1203,21 @@ async function loadAllData() {
     Walk: 'marche', Hike: 'marche',
     Swim: 'swim', WeightTraining: 'muscu', Workout: 'muscu',
   };
+  // When the upstream type is ambiguous (e.g. intervals.icu maps Garmin 'other'
+  // → 'Workout'), the activity name is the most reliable signal. Probe it first.
+  function classifyByName(name) {
+    const n = (name || '').toLowerCase();
+    if (/dans[ea]|dance|zumba|salsa|bachata/.test(n)) return 'danse';
+    if (/yoga|stretch|étirement|pilate/.test(n)) return 'yoga';
+    if (/muscu|strength|gainage|crossfit|hiit/.test(n)) return 'muscu';
+    if (/swim|nage|natation|piscine|aqua/.test(n)) return 'swim';
+    if (/walk|marche|hike|rando/.test(n)) return 'marche';
+    return null;
+  }
   workoutsExt = (wk1.data || []).map(w => {
     const m = w.metadata || {};
     const sportType = m.sport_type || m.type || '';
-    const type = TYPE_MAP[sportType] || (sportType.toLowerCase().includes('ride') ? 'velo' : sportType.toLowerCase().includes('run') ? 'course' : 'velo');
+    const type = classifyByName(m.name) || TYPE_MAP[sportType] || (sportType.toLowerCase().includes('ride') ? 'velo' : sportType.toLowerCase().includes('run') ? 'course' : 'velo');
     return {
       id: w.id,
       external_id: w.external_id,
@@ -1526,8 +1542,10 @@ function analyserSortie() {
 
 // ===== HISTORIQUES =====
 function histItemHTML(s, index, who) {
-  const icon = s.type==='course'?'🏃':s.type==='marche'?'🚶':'🚴';
-  const label = s.type==='course'?'Course':s.type==='marche'?'Marche':'Vélo';
+  const ICONS = { course:'🏃', marche:'🚶', velo:'🚴', danse:'💃', yoga:'🧘', muscu:'🏋️', swim:'🏊' };
+  const LABELS = { course:'Course', marche:'Marche', velo:'Vélo', danse:'Danse', yoga:'Yoga', muscu:'Muscu', swim:'Natation' };
+  const icon = ICONS[s.type] || '🚴';
+  const label = LABELS[s.type] || (s.name || 'Activité');
   const allure = s.type==='course'&&s.dist&&s.duree ? (s.duree/s.dist).toFixed(1)+"'/km" : s.dist&&s.duree ? (s.dist/s.duree*60).toFixed(1)+' km/h' : '—';
   // Tags enrichis (Garmin)
   const tags = [];
