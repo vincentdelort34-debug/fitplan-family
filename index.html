@@ -433,6 +433,21 @@ select option { background: var(--surface); color: var(--text); }
 
 <!-- ======= VINCENT ======= -->
 <div id="dashboard" class="section active">
+  <!-- BANNER STRAVA (apparait pour les users sans connexion Strava active, dismissible) -->
+  <div id="strava-banner" class="card" style="display:none;background:linear-gradient(135deg,#FC4C02,#E83C00);color:#fff;padding:14px 16px;margin-bottom:12px;position:relative;">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      <div style="font-size:28px;line-height:1;">🟠</div>
+      <div style="flex:1;min-width:200px;">
+        <div style="font-weight:700;font-size:15px;margin-bottom:2px;">Connecte ton Strava à FitPlan</div>
+        <div style="font-size:13px;opacity:0.9;">Toutes tes sorties remontent auto · 6 mois d'historique importés en 1 clic.</div>
+      </div>
+      <button onclick="stravaBannerConnect()" style="background:#fff;color:#FC4C02;border:none;padding:8px 16px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;">
+        Connecter →
+      </button>
+      <button onclick="stravaBannerDismiss()" aria-label="Fermer" style="background:transparent;border:none;color:#fff;font-size:22px;cursor:pointer;padding:4px 8px;line-height:1;opacity:0.7;">✕</button>
+    </div>
+  </div>
+
 
   <!-- BILAN IA DU JOUR -->
   <div class="card" style="background:linear-gradient(135deg,var(--blue-pale),#fff);">
@@ -1035,6 +1050,39 @@ function showApp() {
   const headerUser = document.getElementById('header-user');
   if (headerUser && userProfile) headerUser.textContent = userProfile.nom;
   loadAllData();
+  checkStravaBanner();
+}
+
+// ============================================================
+// BANNER STRAVA — affichage conditionnel
+// Apparait pour les users sans connexion Strava active,
+// sauf s'ils l'ont fermé (stocké en localStorage).
+// ============================================================
+async function checkStravaBanner() {
+  const banner = document.getElementById('strava-banner');
+  if (!banner || !currentUser || !sb) return;
+  const dismissedKey = `strava_banner_dismissed_${currentUser.id}`;
+  if (localStorage.getItem(dismissedKey) === '1') { banner.style.display = 'none'; return; }
+  try {
+    const { data } = await sb.from('user_connections').select('id, status')
+      .eq('user_id', currentUser.id).eq('source', 'strava').eq('status', 'active').maybeSingle();
+    if (data) { banner.style.display = 'none'; return; }
+  } catch (e) { console.warn('checkStravaBanner:', e); }
+  banner.style.display = 'block';
+}
+
+function stravaBannerConnect() {
+  showSection('connexions');
+  setTimeout(() => {
+    const target = document.getElementById('connexions');
+    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 100);
+}
+
+function stravaBannerDismiss() {
+  const banner = document.getElementById('strava-banner');
+  if (banner) banner.style.display = 'none';
+  if (currentUser) localStorage.setItem(`strava_banner_dismissed_${currentUser.id}`, '1');
 }
 
 async function loadUserProfile() {
