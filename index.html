@@ -1072,11 +1072,11 @@ async function checkStravaBanner() {
 }
 
 function stravaBannerConnect() {
-  showSection('connexions');
-  setTimeout(() => {
-    const target = document.getElementById('connexions');
-    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, 100);
+  if (!currentUser || !currentUser.id) {
+    alert('Compte en cours de chargement, réessaie dans 1 seconde.');
+    return;
+  }
+  window.location.href = '/api/oauth?action=connect&provider=strava&user=' + encodeURIComponent(currentUser.id);
 }
 
 function stravaBannerDismiss() {
@@ -3319,7 +3319,7 @@ function renderStravaCard(c) {
     pill('strava-status-pill','disabled','Non connecté');
     el.innerHTML = `
       <p style="margin:0 0 10px;">Connecte ton compte Strava pour récupérer automatiquement toutes tes sorties (vélo, course, trail, gravel) en temps réel via webhook.</p>
-      <a class="btn" href="/api/oauth?action=connect&provider=strava&user=${currentUser.id}" style="background:#fc4c02;color:#fff;display:inline-block;text-decoration:none;">Se connecter avec Strava</a>`;
+      <a class="btn" href="/api/oauth?action=connect&provider=strava&user=${encodeURIComponent(currentUser?.id||'')}" style="background:#fc4c02;color:#fff;display:inline-block;text-decoration:none;">Se connecter avec Strava</a>`;
     return;
   }
   pill('strava-status-pill', c.status, c.status === 'active' ? 'Connecté' : c.status);
