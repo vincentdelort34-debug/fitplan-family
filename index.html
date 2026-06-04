@@ -575,9 +575,9 @@ select option { background: var(--surface); color: var(--text); }
   <div class="card" id="petitdej-card-v">
     <div class="card-title">🌅 Petit-déjeuner habituel</div>
     <div style="display:flex;align-items:center;gap:12px;padding:10px 0;">
-      <div style="flex:1;">
+      <div style="flex:1;cursor:pointer;" onclick="configurerPetitDej('v')" title="Configurer mon petit-déj habituel">
         <div style="font-size:14px;font-weight:600;" id="petitdej-label-v">Configure ton petit-déjeuner habituel</div>
-        <div style="font-size:12px;color:var(--muted);margin-top:3px;" id="petitdej-macros-v">Tape sur "Modifier →" pour le définir une fois</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:3px;" id="petitdej-macros-v">Tape ici pour le définir ✏️</div>
       </div>
       <button id="petitdej-btn-v" class="btn" style="margin-top:0;padding:10px 16px;white-space:nowrap;" onclick="validerPetitDej('v')">✓ Validé</button>
     </div>
@@ -1092,6 +1092,11 @@ async function loadUserProfile() {
     POIDS_DEPART = parseFloat(userProfile.poids_depart) || 0;
     POIDS_OBJECTIF = parseFloat(userProfile.poids_objectif) || 0;
     OBJECTIF_KCAL_USER = userProfile.objectif_kcal || 1800;
+    // Charge le petit-déj habituel depuis Supabase (priorité sur localStorage)
+    if (userProfile.petit_dej) {
+      petitDejConfig.v = { ...PETITDEJ_EMPTY, ...userProfile.petit_dej };
+      try { localStorage.setItem(petitDejKey(), JSON.stringify(petitDejConfig)); } catch(e){}
+    }
     showApp();
   } else {
     document.getElementById('auth-screen').style.display = 'none';
@@ -2726,7 +2731,15 @@ function loadPetitDej() {
   } catch(e){}
   return { v: { ...PETITDEJ_EMPTY }, e: { ...PETITDEJ_EMPTY } };
 }
-function savePetitDej() { try { localStorage.setItem(petitDejKey(), JSON.stringify(petitDejConfig)); } catch(e){} }
+function savePetitDej() {
+  try { localStorage.setItem(petitDejKey(), JSON.stringify(petitDejConfig)); } catch(e){}
+  // Persist dans Supabase pour multi-device
+  if (sb && currentUser && currentUser.id) {
+    const who = (userProfile?.nom && userProfile.nom.toLowerCase().startsWith('v')) ? 'v' : 'v';
+    const cfg = petitDejConfig[who] || petitDejConfig.v;
+    sb.from('fitplan_profils').update({ petit_dej: cfg }).eq('id', currentUser.id).then(() => {});
+  }
+}
 let petitDejConfig = { v: { ...PETITDEJ_EMPTY }, e: { ...PETITDEJ_EMPTY } };
 
 const SLOT_ICONS = { 'petit-dej': '🌅', 'dejeuner': '☀️', 'collation': '🍎', 'diner': '🌙' };
