@@ -623,7 +623,7 @@ select option { background: var(--surface); color: var(--text); }
 
     <!-- PHOTO -->
     <div class="repas-photo-zone" onclick="document.getElementById('repas-photo-v').click()">
-      <input type="file" id="repas-photo-v" accept="image/*" capture="environment" onchange="handleRepasPhoto(event,'v')">
+      <input type="file" id="repas-photo-v" accept="image/*" onchange="handleRepasPhoto(event,'v')">
       <img id="repas-photo-preview-v" class="repas-photo-preview">
       <div id="repas-photo-label-v">
         <div style="font-size:1.6rem;margin-bottom:5px;">📸</div>
@@ -713,7 +713,7 @@ select option { background: var(--surface); color: var(--text); }
     <div class="card-title">🧺 Recettes depuis mon frigo</div>
     <div class="text-muted" style="margin-bottom:12px;">Prends une photo de tes ingrédients ou saisis-les — l'IA propose des recettes adaptées perte de poids</div>
     <div class="frigo-zone" id="frigo-zone" onclick="document.getElementById('frigo-photo').click()">
-      <input type="file" id="frigo-photo" accept="image/*" capture="environment" onchange="handleFrigoPhoto(event)">
+      <input type="file" id="frigo-photo" accept="image/*" onchange="handleFrigoPhoto(event)">
       <img id="frigo-preview" class="frigo-preview">
       <div id="frigo-drop-label">
         <div style="font-size:2rem;margin-bottom:8px;">📸</div>
