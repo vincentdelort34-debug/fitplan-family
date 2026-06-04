@@ -2640,11 +2640,26 @@ function handleFrigoPhoto(event) {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = function(e) {
-    frigoImageBase64 = e.target.result.split(',')[1];
-    const preview = document.getElementById('frigo-preview');
-    preview.src = e.target.result;
-    preview.classList.add('visible');
-    document.getElementById('frigo-drop-label').style.display = 'none';
+    // Resize la photo à max 1024px pour rester sous la limite Vercel (4.5 MB)
+    const img = new Image();
+    img.onload = function() {
+      const MAX = 1024;
+      let w = img.width, h = img.height;
+      if (w > MAX || h > MAX) {
+        const scale = MAX / Math.max(w, h);
+        w = Math.round(w * scale); h = Math.round(h * scale);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+      frigoImageBase64 = dataUrl.split(',')[1];
+      const preview = document.getElementById('frigo-preview');
+      preview.src = dataUrl;
+      preview.classList.add('visible');
+      document.getElementById('frigo-drop-label').style.display = 'none';
+    };
+    img.src = e.target.result;
   };
   reader.readAsDataURL(file);
 }
@@ -2855,10 +2870,25 @@ function handleRepasPhoto(event, who) {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = function(e) {
-    repasPhotoBase64[who] = e.target.result.split(',')[1];
-    const preview = document.getElementById('repas-photo-preview-' + who);
-    preview.src = e.target.result; preview.classList.add('visible');
-    document.getElementById('repas-photo-label-' + who).style.display = 'none';
+    // Resize la photo à max 1024px et compresse en JPEG 0.75 pour rester sous la limite Vercel (4.5 MB)
+    const img = new Image();
+    img.onload = function() {
+      const MAX = 1024;
+      let w = img.width, h = img.height;
+      if (w > MAX || h > MAX) {
+        const scale = MAX / Math.max(w, h);
+        w = Math.round(w * scale); h = Math.round(h * scale);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+      repasPhotoBase64[who] = dataUrl.split(',')[1];
+      const preview = document.getElementById('repas-photo-preview-' + who);
+      preview.src = dataUrl; preview.classList.add('visible');
+      document.getElementById('repas-photo-label-' + who).style.display = 'none';
+    };
+    img.src = e.target.result;
   };
   reader.readAsDataURL(file);
 }
