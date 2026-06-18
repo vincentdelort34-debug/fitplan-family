@@ -2405,7 +2405,9 @@ function inviterProches(){
 let _three3dP=null;
 function _loadThree(){ if(window.THREE) return Promise.resolve(); if(_three3dP) return _three3dP;
   _three3dP=new Promise((res,rej)=>{ const sc=document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js'; sc.onload=()=>res(); sc.onerror=()=>rej(new Error('Three.js indisponible')); document.head.appendChild(sc); }); return _three3dP; }
-function _close3d(){ const m=document.getElementById('act3d-modal'); if(m) m.remove(); }
+function _close3d(){ const m=document.getElementById('act3d-modal'); if(m) m.remove(); document.removeEventListener('keydown',_esc3d); }
+function _esc3d(e){ if(e.key==='Escape') _close3d(); }
+window._close3d=_close3d; window.openActivity3D=function(){return openActivity3D.apply(null,arguments);};
 async function openActivity3D(source, activityId, name){
   let m=document.getElementById('act3d-modal'); if(m) m.remove();
   m=document.createElement('div'); m.id='act3d-modal';
@@ -2467,8 +2469,8 @@ function _render3DRoute(S){
   const geo=new THREE.TubeGeometry(curve,T,0.9,RAD,false);
   geo.setAttribute('color',new THREE.Float32BufferAttribute(new Array(geo.attributes.position.count*3).fill(1),3));
   grp.add(new THREE.Mesh(geo,new THREE.MeshStandardMaterial({vertexColors:true,metalness:0.3,roughness:0.45})));
-  grp.add(Object.assign(new THREE.Mesh(new THREE.SphereGeometry(2.2,16,16),new THREE.MeshBasicMaterial({color:0x33e0c0})),{position:P[0]}));
-  grp.add(Object.assign(new THREE.Mesh(new THREE.SphereGeometry(2.2,16,16),new THREE.MeshBasicMaterial({color:0xff5d6c})),{position:P[n-1]}));
+  const _sm0=new THREE.Mesh(new THREE.SphereGeometry(2.2,16,16),new THREE.MeshBasicMaterial({color:0x33e0c0})); _sm0.position.copy(P[0]); grp.add(_sm0);
+  const _sm1=new THREE.Mesh(new THREE.SphereGeometry(2.2,16,16),new THREE.MeshBasicMaterial({color:0xff5d6c})); _sm1.position.copy(P[n-1]); grp.add(_sm1);
   function apply(idx){ const arr=metrics[idx][2],mn=Math.min(...arr),mx=Math.max(...arr),ca=geo.attributes.color,rv=RAD+1;
     for(let r=0;r<=T;r++){ const j=Math.round(r/T*(n-1)),c=_pal((arr[j]-mn)/(mx-mn||1)).map(v=>v/255); for(let q=0;q<rv;q++)ca.setXYZ(r*rv+q,c[0],c[1],c[2]); } ca.needsUpdate=true; }
   apply(0);
@@ -2479,6 +2481,22 @@ function _render3DRoute(S){
   window.addEventListener('pointerup',()=>drag=false);
   (function loop(){ if(!document.getElementById('act3d-modal'))return; requestAnimationFrame(loop); if(auto){rotY+=0.003;setR();} rend.render(scene,cam); })();
 }
+
+// ===== RETOUR DE CONNEXION OAUTH (affiche succes/erreur au lieu du silence) =====
+(function(){
+  try{
+    const q=new URLSearchParams(location.search);
+    const provs={strava:'Strava',intervals:'Intervals.icu',fitbit:'Fitbit',withings:'Withings'};
+    for(const pv in provs){ if(!q.has(pv)) continue;
+      const v=q.get(pv), name=provs[pv], msg=q.get('msg')||'';
+      if(v==='connected'){ setTimeout(()=>alert('✅ '+name+' connecté ! La synchronisation démarre, tes activités vont remonter.'),500); }
+      else if(v==='error'){ setTimeout(()=>alert('⚠️ Connexion '+name+' impossible.\n'+(msg?('Détail : '+msg+'\n'):'')+(pv==='strava'?'\nNote : Strava limite les nouvelles apps à 1 seul athlète (le propriétaire). Pour les autres comptes, connecte plutôt Intervals.icu — même données, sans cette limite.':'')),500); }
+      q.delete(pv); q.delete('msg');
+      history.replaceState(null,'',location.pathname+(q.toString()?'?'+q.toString():''));
+      break;
+    }
+  }catch(e){}
+})();
 
 // ===== LECTURE VOCALE DU BILAN (voix ElevenLabs via /api/tts) =====
 let _bilanAudio = null;
