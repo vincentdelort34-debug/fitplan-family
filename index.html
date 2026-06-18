@@ -1558,7 +1558,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ===== ANALYSE IA =====
 function callAPI(prompt, targetId) {
-  fetch('https://viti-tracabilit.vercel.app/api/chat', {
+  fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ max_tokens: 1500, messages: [{ role: 'user', content: prompt }] })
@@ -2080,7 +2080,7 @@ Fais un BILAN SANTÉ COMPLET et personnalisé en 4 sections :
 Français direct, ton coach pas culpabilisant, chiffres précis. Max 280 mots.`;
   }
 
-  fetch('https://viti-tracabilit.vercel.app/api/chat', {
+  fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ max_tokens: 2000, messages: [{ role: 'user', content: prompt }] })
@@ -2356,7 +2356,7 @@ Génère un bilan soir en 3 points :
 Ton direct, bienveillant, max 120 mots. Tutoiement.`
   };
 
-  fetch('https://viti-tracabilit.vercel.app/api/chat', {
+  fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ max_tokens: 400, messages: [{ role: 'user', content: prompts[moment] }] })
@@ -2589,7 +2589,7 @@ Répartis entre 3 recettes "repas rapide semaine" et 3 "recettes plaisir weekend
 Réponds UNIQUEMENT en JSON valide, sans markdown, sans backticks :
 [{"emoji":"🥗","name":"Nom recette","quand":"Midi","kcal":520,"prot":"32g","glu":"38g","lip":"14g","contexte":"Rapide semaine","detail":"<b>Ingrédients :</b> liste<br><b>Préparation :</b> étapes<br>⏱ X min"}]`;
 
-  fetch('https://viti-tracabilit.vercel.app/api/chat', {
+  fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ max_tokens: 3000, messages: [{ role: 'user', content: prompt }] })
@@ -2696,7 +2696,7 @@ function genererRecettesFrigo() {
     messages = [{ role: 'user', content: `Ingrédients disponibles : ${ingredientsText}. Génère 3 recettes perte de poids avec ces ingrédients.` }];
   }
 
-  fetch('https://viti-tracabilit.vercel.app/api/chat', {
+  fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ max_tokens: 1500, system: systemPrompt, messages })
@@ -2840,7 +2840,7 @@ function calculerPetitDejIA(who) {
   if (!desc) return;
   const btn = document.querySelector('#modal-body button');
   btn.textContent = '…'; btn.disabled = true;
-  fetch('https://viti-tracabilit.vercel.app/api/chat', {
+  fetch('/api/chat', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 200,
       messages: [{ role: 'user', content: `Calcule les macros de ce petit-déjeuner : "${desc}". Réponds UNIQUEMENT en JSON : {"kcal":380,"proteines":25,"glucides":30,"lipides":10}` }]
@@ -2930,7 +2930,7 @@ function analyserRepas(who) {
     messages = [{ role: 'user', content: `Repas : ${text}` }];
   }
 
-  fetch('https://viti-tracabilit.vercel.app/api/chat', {
+  fetch('/api/chat', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 400, system: sys, messages })
   }).then(r => r.json()).then(d => {
