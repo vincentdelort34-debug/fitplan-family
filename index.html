@@ -1647,7 +1647,7 @@ function histItemHTML(s, index, who) {
   const wkId = s.external_id || s.id || (s.date + '_' + (s.name||index));
   const analyzeBtn = `<button class="btn-icon" onclick="analyzeWorkout('${wkId}', this)" title="Analyser cette sortie avec l'IA coach" style="background:linear-gradient(135deg,#7F77DD,#534AB7);color:#fff;border:none;">✨</button>`;
   const _aid3d = s.strava_id || s.garmin_id;
-  const view3dBtn = _aid3d ? `<button class="btn-icon" onclick="openActivity3D('${s._source||'strava'}','${_aid3d}','${(s.name||'Sortie').replace(/[^0-9A-Za-zÀ-ÿ -]/g,'').slice(0,40)}')" title="Voir le parcours en 3D" style="background:linear-gradient(135deg,#2f6df0,#33e0c0);color:#fff;border:none;">🌐</button>` : '';
+  const view3dBtn = (_aid3d && ['course','velo','marche','trail','rando','gravel','hike','run','ride','walk'].includes(s.type) && !s.trainer) ? `<button class="btn-icon" onclick="openActivity3D('${s._source||'strava'}','${_aid3d}','${(s.name||'Sortie').replace(/[^0-9A-Za-zÀ-ÿ -]/g,'').slice(0,40)}')" title="Voir le parcours en 3D" style="background:linear-gradient(135deg,#2f6df0,#33e0c0);color:#fff;border:none;">🌐</button>` : '';
   const actions = s._readonly
     ? `<div class="item-actions">${analyzeBtn}${view3dBtn}<span style="font-size:10px;color:var(--muted);margin-left:6px;">read-only</span></div>`
     : `<div class="item-actions">
@@ -2434,7 +2434,7 @@ async function openActivity3D(source, activityId, name){
     const r=await fetch('/api/activity-streams',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,source,activity_id:activityId})});
     const d=await r.json();
     if(!r.ok) throw new Error(d.error||('HTTP '+r.status));
-    if(!d.latlng||d.latlng.length<3) throw new Error("Pas de tracé GPS pour cette activité.");
+    if(!d.latlng||d.latlng.length<3) throw new Error("Pas de tracé GPS sur cette activité (normal pour la danse, la muscu, le home-trainer ou la natation). Essaie une sortie vélo ou course en extérieur.");
     _render3DRoute(d);
   }catch(e){ const b=document.getElementById('act3d-body'); if(b) b.innerHTML='<div>😕 '+e.message+'</div>'; }
 }
