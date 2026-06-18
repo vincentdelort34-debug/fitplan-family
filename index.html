@@ -434,14 +434,14 @@ select option { background: var(--surface); color: var(--text); }
 <!-- ======= VINCENT ======= -->
 <div id="dashboard" class="section active">
   <!-- BANNER STRAVA (apparait pour les users sans connexion Strava active, dismissible) -->
-  <div id="strava-banner" class="card" style="display:none;background:linear-gradient(135deg,#FC4C02,#E83C00);color:#fff;padding:14px 16px;margin-bottom:12px;position:relative;">
+  <div id="strava-banner" class="card" style="display:none;background:linear-gradient(135deg,#534AB7,#7F77DD);color:#fff;padding:14px 16px;margin-bottom:12px;position:relative;">
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-      <div style="font-size:28px;line-height:1;">🟠</div>
+      <div style="font-size:28px;line-height:1;">📊</div>
       <div style="flex:1;min-width:200px;">
-        <div style="font-weight:700;font-size:15px;margin-bottom:2px;">Connecte ton Strava à FitPlan</div>
-        <div style="font-size:13px;opacity:0.9;">Toutes tes sorties remontent auto · 6 mois d'historique importés en 1 clic.</div>
+        <div style="font-weight:700;font-size:15px;margin-bottom:2px;">Connecte Intervals.icu à FitPlan</div>
+        <div style="font-size:13px;opacity:0.92;">Le pont universel vers ta montre (Garmin, Strava, Coros…) : sommeil, FC, HRV, puissance et activités remontent auto — sans la limite « 1 athlète » de Strava.</div>
       </div>
-      <button onclick="stravaBannerConnect()" style="background:#fff;color:#FC4C02;border:none;padding:8px 16px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;">
+      <button onclick="goConnectIntervals()" style="background:#fff;color:#534AB7;border:none;padding:8px 16px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;">
         Connecter →
       </button>
       <button onclick="stravaBannerDismiss()" aria-label="Fermer" style="background:transparent;border:none;color:#fff;font-size:22px;cursor:pointer;padding:4px 8px;line-height:1;opacity:0.7;">✕</button>
@@ -1077,7 +1077,7 @@ async function checkStravaBanner() {
   if (localStorage.getItem(dismissedKey) === '1') { banner.style.display = 'none'; return; }
   try {
     const { data } = await sb.from('user_connections').select('id, status')
-      .eq('user_id', currentUser.id).eq('source', 'strava').eq('status', 'active').maybeSingle();
+      .eq('user_id', currentUser.id).eq('source', 'intervals_icu').eq('status', 'active').maybeSingle();
     if (data) { banner.style.display = 'none'; return; }
   } catch (e) { console.warn('checkStravaBanner:', e); }
   banner.style.display = 'block';
@@ -1095,6 +1095,14 @@ function stravaBannerDismiss() {
   const banner = document.getElementById('strava-banner');
   if (banner) banner.style.display = 'none';
   if (currentUser) localStorage.setItem(`strava_banner_dismissed_${currentUser.id}`, '1');
+}
+function goConnectIntervals() {
+  document.querySelectorAll('.section').forEach(x => { x.classList.remove('active'); x.style.display = 'none'; });
+  const el = document.getElementById('connexions'); if (el) { el.style.display = ''; el.classList.add('active'); }
+  document.querySelectorAll('#tabs-vincent .tab').forEach(t => { if (t.textContent.indexOf('Connexions') !== -1) t.classList.add('active'); else t.classList.remove('active'); });
+  if (typeof loadConnexions === 'function') loadConnexions();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  setTimeout(() => { const c = document.getElementById('intervals-card-content'); if (c) c.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 350);
 }
 
 async function loadUserProfile() {
@@ -3609,8 +3617,8 @@ function renderStravaCard(c) {
   if (!c) {
     pill('strava-status-pill','disabled','Non connecté');
     el.innerHTML = `
-      <p style="margin:0 0 10px;">Connecte ton compte Strava pour récupérer automatiquement toutes tes sorties (vélo, course, trail, gravel) en temps réel via webhook.</p>
-      <a class="btn" href="/api/oauth?action=connect&provider=strava&user=${encodeURIComponent(currentUser?.id||'')}" style="background:#fc4c02;color:#fff;display:inline-block;text-decoration:none;">Se connecter avec Strava</a>`;
+      <p style="margin:0 0 8px;">⚠️ Strava limite les nouvelles applications à <b>1 seul athlète</b> (le propriétaire). Les autres comptes ne peuvent pas s'y connecter pour le moment.</p>
+      <p style="margin:0;color:var(--muted);">👉 Connecte plutôt <b>Intervals.icu</b> (carte ci-dessous) : il récupère tes activités Garmin/Strava/Coros <b>sans cette limite</b>, avec en prime la puissance, la charge et les zones.</p>`;
     return;
   }
   pill('strava-status-pill', c.status, c.status === 'active' ? 'Connecté' : c.status);
