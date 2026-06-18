@@ -2315,9 +2315,23 @@ function _semaineStats(){
   const sortiesW=sorties.filter(s=>inWeek(s.date));
   const km=Math.round(sortiesW.reduce((a,s)=>a+(s.dist||0),0));
   const dplus=Math.round(sortiesW.reduce((a,s)=>a+(s.dplus||0),0));
+  const poids=(userProfile&&(userProfile.poids_actuel||userProfile.poids_depart))||75;
+  let kcal=0;
+  sortiesW.forEach(s=>{ const m=String(s.ressenti||'').match(/(\d{2,5})\s*k?cal/i);
+    kcal += m?parseInt(m[1]):Math.round((s.dist||0)*poids*(s.type==='course'?0.9:0.5)); });
+  kcal=Math.round(kcal);
+  const dailyKm=[];
+  for(let i=6;i>=0;i--){ const d=new Date(now); d.setDate(now.getDate()-i);
+    const ds=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    dailyKm.push(Math.round(sorties.filter(s=>s.date===ds).reduce((a,s)=>a+(s.dist||0),0))); }
+  const repasW=((typeof repasVincent!=='undefined'&&repasVincent)||[]).filter(r=>inWeek(r.date));
+  const joursRepas=new Set(repasW.map(r=>r.date)).size;
+  const protTot=repasW.reduce((a,r)=>a+(r.proteines||0),0);
+  const protMoy=joursRepas?Math.round(protTot/joursRepas):0;
   const glycoOk=(typeof glycoData!=='undefined' && glycoData && glycoData.length>0);
-  // Volontairement SANS poids ni objectif (confidentiel) : stats "flex" partageables uniquement.
-  return { nbSorties:sortiesW.length, km, dplus, glycoOk };
+  const pts=(glycoOk?1:0)+(sortiesW.length>=3?1:0)+(joursRepas>=4?1:0);
+  const etat = pts>=3?'Excellent':(pts>=2?'Bon':'Correct');
+  return { nbSorties:sortiesW.length, km, dplus, kcal, dailyKm, joursRepas, protMoy, glycoOk, etat };
 }
 function _round(x,px,py,w,h,r){ x.beginPath(); x.moveTo(px+r,py); x.arcTo(px+w,py,px+w,py+h,r); x.arcTo(px+w,py+h,px,py+h,r); x.arcTo(px,py+h,px,py,r); x.arcTo(px,py,px+w,py,r); x.closePath(); }
 function _wrap(x,text,px,py,maxw,lh){ const words=text.split(" "); let line="",yy=py; words.forEach(w=>{ const t=line+w+" "; if(x.measureText(t).width>maxw && line){ x.fillText(line.trim(),px,yy); line=w+" "; yy+=lh; } else line=t; }); x.fillText(line.trim(),px,yy); }
@@ -2325,28 +2339,40 @@ function _drawRecap(){
   const c=document.getElementById('recap-canvas'), x=c.getContext('2d'); const W=1080,H=1350, s=_semaineStats();
   const g=x.createLinearGradient(0,0,W,H); g.addColorStop(0,'#0f2540'); g.addColorStop(1,'#173458'); x.fillStyle=g; x.fillRect(0,0,W,H);
   x.fillStyle='#e8622a'; x.fillRect(0,0,W,14);
-  x.textAlign='left'; x.fillStyle='#fff'; x.font='800 66px -apple-system,Inter,sans-serif';
-  x.fillText('Fit',80,160); const fw=x.measureText('Fit').width; x.fillStyle='#e8622a'; x.fillText('Plan',80+fw,160);
-  x.fillStyle='rgba(255,255,255,.65)'; x.font='700 32px -apple-system,Inter,sans-serif'; x.fillText('MA SEMAINE',84,220);
-  const stats=[];
-  stats.push([String(s.nbSorties),'Sorties']);
-  if(s.km) stats.push([s.km+' km','Parcourus']);
-  if(s.dplus) stats.push([s.dplus+' m','Dénivelé']);
-  if(s.glycoOk) stats.push(['stable','Glycémie']);
-  const bx=80,by=320,bw=(W-160-40)/2,bh=240;
-  stats.slice(0,4).forEach((st,i)=>{
-    const px=bx+(i%2)*(bw+40), py=by+Math.floor(i/2)*(bh+40);
-    x.fillStyle='rgba(255,255,255,.07)'; _round(x,px,py,bw,bh,28); x.fill();
-    x.fillStyle='#fff'; x.textAlign='center'; x.font='800 86px -apple-system,Inter,sans-serif'; x.fillText(st[0],px+bw/2,py+135);
-    x.fillStyle='rgba(255,255,255,.6)'; x.font='700 30px -apple-system,Inter,sans-serif'; x.fillText(st[1].toUpperCase(),px+bw/2,py+190);
-  });
-  x.textAlign='left'; x.fillStyle='#e8622a'; x.font='800 30px -apple-system,Inter,sans-serif'; x.fillText('LE MOT DU COACH',84,985);
-  x.fillStyle='#fff'; x.font='600 46px -apple-system,Inter,sans-serif';
-  const phrase = (s.km>=50) ? (s.km+" km dans les jambes cette semaine. On continue.")
-               : (s.nbSorties>0 ? 'Regularite = resultats. On lache rien.' : "Nouvelle semaine, on s'y met.");
-  _wrap(x,phrase,84,1050,W-168,58);
-  x.fillStyle='rgba(255,255,255,.5)'; x.font='700 30px -apple-system,Inter,sans-serif'; x.textAlign='center';
-  x.fillText('Suis ta forme avec FitPlan · fitplan-family.vercel.app',W/2,1295);
+  x.textAlign='left'; x.fillStyle='#fff'; x.font='800 64px -apple-system,Inter,sans-serif';
+  x.fillText('Fit',80,150); const fw=x.measureText('Fit').width; x.fillStyle='#e8622a'; x.fillText('Plan',80+fw,150);
+  x.fillStyle='rgba(255,255,255,.6)'; x.font='700 30px -apple-system,Inter,sans-serif'; x.fillText('MA SEMAINE',84,205);
+  // Courbe sport km/jour
+  x.fillStyle='#e8622a'; x.font='800 28px -apple-system,Inter,sans-serif'; x.fillText('PROGRESSION SPORT — KM / JOUR',80,280);
+  const cx=80, cy=305, cw=W-160, ch=175, mx=Math.max.apply(null,s.dailyKm.concat([1]));
+  x.fillStyle='rgba(255,255,255,.05)'; _round(x,cx,cy,cw,ch,24); x.fill();
+  const n=s.dailyKm.length, PX=i=>cx+35+i*(cw-70)/(n-1), PY=v=>cy+ch-32-(v/mx)*(ch-60);
+  x.strokeStyle='#3b82f6'; x.lineWidth=4; x.beginPath();
+  s.dailyKm.forEach((v,i)=>{ const X=PX(i),Y=PY(v); i?x.lineTo(X,Y):x.moveTo(X,Y); }); x.stroke();
+  s.dailyKm.forEach((v,i)=>{ const X=PX(i),Y=PY(v); x.fillStyle='#3b82f6'; x.beginPath(); x.arc(X,Y,7,0,7); x.fill();
+    if(v){ x.fillStyle='#fff'; x.font='700 24px -apple-system,Inter,sans-serif'; x.textAlign='center'; x.fillText(v,X,Y-18); } });
+  // 3 tuiles : Sorties / Energie / Denivele
+  const tiles=[[String(s.nbSorties),'SORTIES'],[s.kcal.toLocaleString('fr-FR'),'KCAL DÉPENSÉES'],[(s.dplus||0)+' m','DÉNIVELÉ']];
+  const tw=(W-160-60)/3, th=190, ty=525;
+  tiles.forEach((t,i)=>{ const tx=80+i*(tw+30);
+    x.fillStyle='rgba(255,255,255,.07)'; _round(x,tx,ty,tw,th,24); x.fill();
+    x.fillStyle='#fff'; x.textAlign='center'; x.font='800 56px -apple-system,Inter,sans-serif'; x.fillText(t[0],tx+tw/2,ty+98);
+    x.fillStyle='rgba(255,255,255,.6)'; x.font='700 22px -apple-system,Inter,sans-serif'; x.fillText(t[1],tx+tw/2,ty+148); });
+  // Bandeau alimentation
+  const by1=755; x.fillStyle='rgba(47,163,122,.15)'; _round(x,80,by1,W-160,118,24); x.fill();
+  x.textAlign='left'; x.fillStyle='#3ddca0'; x.font='800 28px -apple-system,Inter,sans-serif'; x.fillText('🥗  ALIMENTATION',120,by1+48);
+  x.fillStyle='#fff'; x.font='600 32px -apple-system,Inter,sans-serif'; x.fillText('Repas suivis '+s.joursRepas+'/7 j · ~'+s.protMoy+' g protéines/j',120,by1+92);
+  // Bandeau etat de sante
+  const by2=893; x.fillStyle='rgba(59,130,246,.15)'; _round(x,80,by2,W-160,118,24); x.fill();
+  x.fillStyle='#7fb0ff'; x.font='800 28px -apple-system,Inter,sans-serif'; x.fillText('❤️  ÉTAT DE SANTÉ',120,by2+48);
+  x.fillStyle='#fff'; x.font='600 32px -apple-system,Inter,sans-serif'; x.fillText(s.etat+(s.glycoOk?' · glycémie stable':''),120,by2+92);
+  // Mot du coach
+  x.fillStyle='#e8622a'; x.font='800 28px -apple-system,Inter,sans-serif'; x.textAlign='left'; x.fillText('LE MOT DU COACH',84,1075);
+  x.fillStyle='#fff'; x.font='600 38px -apple-system,Inter,sans-serif';
+  const phrase=(s.km>=50)?(s.km+' km dans les jambes cette semaine. On continue.'):(s.nbSorties>0?'Regularite = resultats. On lache rien.':"Nouvelle semaine, on s'y met.");
+  _wrap(x,phrase,84,1128,W-168,48);
+  x.fillStyle='rgba(255,255,255,.5)'; x.font='700 28px -apple-system,Inter,sans-serif'; x.textAlign='center';
+  x.fillText('Suis ta forme avec FitPlan · fitplan-family.vercel.app',W/2,1305);
   return c;
 }
 async function partagerSemaine(){
