@@ -460,6 +460,7 @@ select option { background: var(--surface); color: var(--text); }
       <button class="btn" style="flex:1;background:var(--gold);box-shadow:0 3px 10px rgba(212,168,83,0.3);" onclick="genererBilanIA('matin')">🌅 Bilan matin</button>
       <button class="btn" style="flex:1;background:var(--blue);" onclick="genererBilanIA('soir')">🌙 Bilan soir</button>
     </div>
+    <button id="bilan-listen-btn" class="btn-outline" style="width:100%;margin-top:8px;display:flex;align-items:center;justify-content:center;gap:6px;" onclick="lireBilan()">🔊 Écouter le bilan</button>
   </div>
 
   <!-- SANTÉ DU JOUR — Multi-sources via health_data_unified -->
@@ -2296,6 +2297,35 @@ function renderGlyco() {
 }
 
 // ===== DASHBOARDS =====
+// ===== LECTURE VOCALE DU BILAN (voix ElevenLabs via /api/tts) =====
+let _bilanAudio = null;
+async function lireBilan(){
+  const btn = document.getElementById('bilan-listen-btn');
+  const el = document.getElementById('bilan-ia-text');
+  const txt = (el ? el.textContent : '').trim();
+  if(!txt || /Génération en cours|Génère ton bilan/i.test(txt)){
+    alert("Génère d'abord ton bilan (matin ou soir), puis appuie sur Écouter.");
+    return;
+  }
+  if(_bilanAudio && !_bilanAudio.paused){ _bilanAudio.pause(); _bilanAudio.currentTime=0; _bilanAudio=null; btn.innerHTML='🔊 Écouter le bilan'; return; }
+  const clean = txt.replace(/[*_#`>]/g,'').replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}\u{2700}-\u{27BF}\u{FE0F}]/gu,'').replace(/\s+/g,' ').trim().slice(0,2500);
+  btn.innerHTML='⏳ Génération de la voix…';
+  try{
+    const r = await fetch('/api/tts',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ text: clean }) });
+    if(!r.ok){ let m=''; try{ m=(await r.json()).error||''; }catch(e){} throw new Error(m||('HTTP '+r.status)); }
+    const blob = await r.blob();
+    const audio = new Audio(URL.createObjectURL(blob));
+    _bilanAudio = audio;
+    audio.onended = ()=>{ btn.innerHTML='🔊 Écouter le bilan'; _bilanAudio=null; };
+    audio.onerror = ()=>{ btn.innerHTML='🔊 Écouter le bilan'; };
+    audio.onplay  = ()=>{ btn.innerHTML='⏸ Stop'; };
+    await audio.play();
+  }catch(e){
+    btn.innerHTML='🔊 Écouter le bilan';
+    alert("Voix indisponible : "+e.message);
+  }
+}
+
 function genererBilanIA(moment) {
   const textEl = document.getElementById('bilan-ia-text');
   const heureEl = document.getElementById('bilan-heure');
