@@ -1306,6 +1306,7 @@ async function loadAllData() {
     };
   });
   poidsData = p1.data || [];
+  syncPoidsActuel();
   glycoData = (g1.data || []).map(r => ({ date: r.datetime, val: r.val, ctx: r.ctx, note: r.note, id: r.id }));
   repasVincent = (r1.data || []).map(r => ({ date: r.date, type: r.type, description: r.label, kcal: r.kcal||0, proteines: r.proteines||0, glucides: r.glucides||0, lipides: r.lipides||0, conseil: '', score: null, photoThumb: null, id: r.id }));
   repasElisabeth = [];
@@ -1814,11 +1815,22 @@ function renderHistory() {
 }
 
 // ===== POIDS =====
+// Resynchronise le poids actuel du profil sur la dernière pesée (corrige l'affichage figé)
+function syncPoidsActuel() {
+  if (!Array.isArray(poidsData) || !poidsData.length) return;
+  const dernier = poidsData[poidsData.length - 1].val;
+  const ancien = userProfile ? parseFloat(userProfile.poids_actuel) : null;
+  if (userProfile) userProfile.poids_actuel = dernier;
+  if (sb && currentUser && currentUser.id && ancien !== dernier) {
+    sb.from('fitplan_profils').update({ poids_actuel: dernier }).eq('id', currentUser.id).then(({ error }) => { if (error) console.warn('maj poids_actuel:', error.message); });
+  }
+}
 function ajouterPoids() {
   const date = document.getElementById('p-date').value, val = parseFloat(document.getElementById('p-val').value);
   if (!date || !val) { alert('Remplis date et poids.'); return; }
   poidsData.push({ date, val }); poidsData.sort((a,b) => a.date.localeCompare(b.date));
-  if (sb && currentUser) sb.from('fitplan_poids').insert({ user_id: currentUser.id, date: date, val: val }).then(() => {});
+  if (sb && currentUser) sb.from('fitplan_poids').insert({ user_id: currentUser.id, date: date, val: val }).then(({ error }) => { if (error) alert('Erreur enregistrement du poids : ' + error.message); });
+  syncPoidsActuel();
   document.getElementById('p-val').value = ''; renderPoids(); updateDashboard();
 }
 
@@ -2481,6 +2493,7 @@ function saveModal() {
     poidsData[index] = { ...poidsData[index], date: document.getElementById('m-date').value, val: parseFloat(document.getElementById('m-poids').value) };
     poidsData.sort((a,b) => a.date.localeCompare(b.date));
     if (sb && oldId) { sb.from('fitplan_poids').update({ date: poidsData[index].date, val: poidsData[index].val }).eq('id', oldId).then(() => {}); }
+    syncPoidsActuel();
     renderPoids();
     updateDashboard();
   } else if (type === 'glyco') {
@@ -2511,6 +2524,7 @@ function deleteEntry(type, index, who) {
     const item = poidsData[index];
     if (sb && item.id) sb.from('fitplan_poids').delete().eq('id', item.id).then(() => {});
     poidsData.splice(index, 1);
+    syncPoidsActuel();
     renderPoids();
   } else if (type === 'glyco') {
     const item = glycoData[index];
@@ -2735,9 +2749,12 @@ function savePetitDej() {
   try { localStorage.setItem(petitDejKey(), JSON.stringify(petitDejConfig)); } catch(e){}
   // Persist dans Supabase pour multi-device
   if (sb && currentUser && currentUser.id) {
-    const who = (userProfile?.nom && userProfile.nom.toLowerCase().startsWith('v')) ? 'v' : 'v';
-    const cfg = petitDejConfig[who] || petitDejConfig.v;
-    sb.from('fitplan_profils').update({ petit_dej: cfg }).eq('id', currentUser.id).then(() => {});
+    const cfg = petitDejConfig.v;
+    sb.from('fitplan_profils').update({ petit_dej: cfg }).eq('id', currentUser.id).then(({ error }) => {
+      if (error) { console.error('savePetitDej:', error); alert('Le petit-dejeuner n\'a pas pu etre enregistre : ' + error.message); }
+    });
+  } else {
+    console.warn('savePetitDej: session non prete (sb/currentUser manquant)');
   }
 }
 let petitDejConfig = { v: { ...PETITDEJ_EMPTY }, e: { ...PETITDEJ_EMPTY } };
