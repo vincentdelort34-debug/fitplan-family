@@ -1580,7 +1580,7 @@ function analyserSortie() {
   if (!date || !dist || !duree) { alert('Merci de remplir date, distance et durée.'); return; }
   const poidsActuel = userProfile ? (userProfile.poids_actuel || userProfile.poids_depart || 70) : 70;
   sorties.push({ date, type, dist, duree, fc: fc || null, dplus, ressenti });
-  if (sb && currentUser) sb.from('fitplan_sorties').insert({ user_id: currentUser.id, date, type, dist, duree, fc: fc||null, dplus, ressenti }).then(() => {});
+  if (sb && currentUser) sb.from('fitplan_sorties').insert({ user_id: currentUser.id, who: userProfile?.nom || 'user', date, type, dist, duree, fc: fc||null, dplus, ressenti }).then(({ error }) => { if (error) alert('Erreur enregistrement de la sortie : ' + error.message); });
   document.getElementById('ai-card').style.display = 'block';
   document.getElementById('ai-text').textContent = 'Analyse en cours…';
   document.getElementById('ai-text').className = 'ai-thinking';
@@ -1829,7 +1829,7 @@ function ajouterPoids() {
   const date = document.getElementById('p-date').value, val = parseFloat(document.getElementById('p-val').value);
   if (!date || !val) { alert('Remplis date et poids.'); return; }
   poidsData.push({ date, val }); poidsData.sort((a,b) => a.date.localeCompare(b.date));
-  if (sb && currentUser) sb.from('fitplan_poids').insert({ user_id: currentUser.id, date: date, val: val }).then(({ error }) => { if (error) alert('Erreur enregistrement du poids : ' + error.message); });
+  if (sb && currentUser) sb.from('fitplan_poids').insert({ user_id: currentUser.id, who: userProfile?.nom || 'user', date: date, val: val }).then(({ error }) => { if (error) alert('Erreur enregistrement du poids : ' + error.message); });
   syncPoidsActuel();
   document.getElementById('p-val').value = ''; renderPoids(); updateDashboard();
 }
