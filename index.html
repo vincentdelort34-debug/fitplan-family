@@ -2312,17 +2312,12 @@ function renderGlyco() {
 function _semaineStats(){
   const now=new Date(), weekAgo=new Date(now); weekAgo.setDate(now.getDate()-7);
   const inWeek=d=>{ const x=new Date(d); return x>=weekAgo && x<=now; };
-  const poidsAct = poidsData.length ? poidsData[poidsData.length-1].val : (userProfile?.poids_actuel||userProfile?.poids_depart||null);
-  let delta=null;
-  if(poidsData.length>=2){
-    const before=[...poidsData].reverse().find(p=> new Date(p.date)<=weekAgo) || poidsData[0];
-    if(before && poidsAct!=null) delta=Math.round((poidsAct-before.val)*10)/10;
-  }
   const sortiesW=sorties.filter(s=>inWeek(s.date));
   const km=Math.round(sortiesW.reduce((a,s)=>a+(s.dist||0),0));
-  const obj=userProfile?.poids_objectif;
-  const reste=(poidsAct!=null && obj)? Math.round((poidsAct-obj)*10)/10 : null;
-  return { poidsAct, delta, nbSorties:sortiesW.length, km, reste };
+  const dplus=Math.round(sortiesW.reduce((a,s)=>a+(s.dplus||0),0));
+  const glycoOk=(typeof glycoData!=='undefined' && glycoData && glycoData.length>0);
+  // Volontairement SANS poids ni objectif (confidentiel) : stats "flex" partageables uniquement.
+  return { nbSorties:sortiesW.length, km, dplus, glycoOk };
 }
 function _round(x,px,py,w,h,r){ x.beginPath(); x.moveTo(px+r,py); x.arcTo(px+w,py,px+w,py+h,r); x.arcTo(px+w,py+h,px,py+h,r); x.arcTo(px,py+h,px,py,r); x.arcTo(px,py,px+w,py,r); x.closePath(); }
 function _wrap(x,text,px,py,maxw,lh){ const words=text.split(" "); let line="",yy=py; words.forEach(w=>{ const t=line+w+" "; if(x.measureText(t).width>maxw && line){ x.fillText(line.trim(),px,yy); line=w+" "; yy+=lh; } else line=t; }); x.fillText(line.trim(),px,yy); }
@@ -2334,10 +2329,10 @@ function _drawRecap(){
   x.fillText('Fit',80,160); const fw=x.measureText('Fit').width; x.fillStyle='#e8622a'; x.fillText('Plan',80+fw,160);
   x.fillStyle='rgba(255,255,255,.65)'; x.font='700 32px -apple-system,Inter,sans-serif'; x.fillText('MA SEMAINE',84,220);
   const stats=[];
-  if(s.poidsAct!=null) stats.push([s.poidsAct+' kg','Poids actuel']);
-  if(s.delta!=null) stats.push([(s.delta<=0?'':'+')+s.delta+' kg','Cette semaine']);
   stats.push([String(s.nbSorties),'Sorties']);
   if(s.km) stats.push([s.km+' km','Parcourus']);
+  if(s.dplus) stats.push([s.dplus+' m','Dénivelé']);
+  if(s.glycoOk) stats.push(['stable','Glycémie']);
   const bx=80,by=320,bw=(W-160-40)/2,bh=240;
   stats.slice(0,4).forEach((st,i)=>{
     const px=bx+(i%2)*(bw+40), py=by+Math.floor(i/2)*(bh+40);
@@ -2347,8 +2342,8 @@ function _drawRecap(){
   });
   x.textAlign='left'; x.fillStyle='#e8622a'; x.font='800 30px -apple-system,Inter,sans-serif'; x.fillText('LE MOT DU COACH',84,985);
   x.fillStyle='#fff'; x.font='600 46px -apple-system,Inter,sans-serif';
-  const phrase = (s.reste!=null && s.reste>0) ? ('Plus que '+s.reste+" kg avant l'objectif. On lache rien.")
-               : ((s.delta!=null && s.delta<0) ? 'Belle semaine, la courbe descend.' : 'Regularite = resultats. On continue.');
+  const phrase = (s.km>=50) ? (s.km+" km dans les jambes cette semaine. On continue.")
+               : (s.nbSorties>0 ? 'Regularite = resultats. On lache rien.' : "Nouvelle semaine, on s'y met.");
   _wrap(x,phrase,84,1050,W-168,58);
   x.fillStyle='rgba(255,255,255,.5)'; x.font='700 30px -apple-system,Inter,sans-serif'; x.textAlign='center';
   x.fillText('Suis ta forme avec FitPlan · fitplan-family.vercel.app',W/2,1295);
