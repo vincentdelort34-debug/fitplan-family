@@ -12,7 +12,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Configuration manquante (ELEVENLABS_API_KEY)' });
   }
 
-  const { text, voice_id } = req.body || {};
+  const { text, voice_id, voice_settings } = req.body || {};
   if (!text || !text.trim()) return res.status(400).json({ error: 'Texte manquant' });
 
   // Voix par défaut : pilotable via ELEVENLABS_VOICE_ID (choisis ta voix dans ta bibliothèque ElevenLabs)
@@ -29,7 +29,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         text: text.slice(0, 2500),
         model_id: 'eleven_multilingual_v2',
-        voice_settings: { stability: 0.5, similarity_boost: 0.75, style: 0.0, use_speaker_boost: true },
+        voice_settings: voice_settings || { stability: 0.32, similarity_boost: 0.85, style: 0.55, use_speaker_boost: true },
       }),
     });
 
